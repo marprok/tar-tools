@@ -23,20 +23,20 @@ void print_heaader(const TARHeader& header)
 
 int main()
 {
-        TARStream tar("linux-5.12-rc4.tar");
-        TARParser parser(tar);
+    TARStream tar("linux-5.12-rc4.tar");
+    TARParser parser(tar);
 
-        for (auto i : {1,2,3,4})
+    for (auto i : {1,2,3,4})
+    {
+        auto file = parser.get_next_file();
+        if (std::get<1>(file).size())
         {
-            auto file = parser.get_next_file();
-            if (std::get<1>(file).size())
-            {
-                std::cout << "file " << std::get<0>(file).name << " was found!\n"
-                          << "File size : " << std::get<1>(file).size() << '\n';
-                print_heaader(std::get<0>(file));
+            std::cout << "file " << std::get<0>(file).name << " was found!\n"
+                      << "File size : " << std::get<1>(file).size() << '\n';
+            print_heaader(std::get<0>(file));
 
-                std::cout << "\n\n\n\n\n\n";
-            }
-
+            std::cout << "\n\n\n\n\n\n";
         }
+
+    }
 }

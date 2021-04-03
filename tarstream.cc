@@ -113,13 +113,11 @@ void TARParser::_secure_header(TARHeader &header)
 std::vector<std::uint8_t> TARParser::_unpack(const TARHeader& header)
 {
     std::uint32_t size = std::stoi(header.size, nullptr, 8);
-
     std::uint32_t data_blocks = size/BLOCK_SIZE;
     if (size%BLOCK_SIZE)
         data_blocks++;
 
     std::vector<std::uint8_t> bytes;
-    int temp = 0;
     for (std::uint32_t i = 0; i < data_blocks; ++i)
     {
         TARBlock block;
@@ -135,9 +133,7 @@ std::vector<std::uint8_t> TARParser::_unpack(const TARHeader& header)
             bytes.insert(bytes.end(), block.m_data, block.m_data + bytes_to_copy);
             size -= bytes_to_copy;
         }
-        temp++;
     }
 
     return bytes;
-
 }
