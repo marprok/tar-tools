@@ -1,7 +1,8 @@
 #include <cstring>
+#include <string>
 #include "tarstream.hh"
 
-std::ostream& operator<<(std::ostream& os, const RawBlock& block)
+std::ostream& operator<<(std::ostream& os, const TARBlock& block)
 {
     for (std::uint32_t i = 0; i < BLOCK_SIZE; ++i)
     {
@@ -37,7 +38,7 @@ TARStream::~TARStream()
     }
 }
 
-TARStream::Status TARStream::read_block(RawBlock& raw)
+Status TARStream::read_block(TARBlock& raw)
 {
     if (m_block_id >= m_blocking_factor)
     {
@@ -52,7 +53,7 @@ TARStream::Status TARStream::read_block(RawBlock& raw)
     return Status::TAR_OK;
 }
 
-TARStream::Status TARStream::_fetch_record()
+Status TARStream::_fetch_record()
 {
     if (!m_record)
         m_record = new std::uint8_t[BLOCK_SIZE*m_blocking_factor]; // let it fail
@@ -66,4 +67,55 @@ TARStream::Status TARStream::_fetch_record()
     }
 
     return Status::TAR_EOF;
+}
+
+
+TARParser::TARParser(TARStream &tar_stream)
+    :m_tar_stream(tar_stream)
+{
+}
+
+TARFile TARParser::get_next_file()
+{
+    TARFile file;
+    TARBlock header_block;
+
+    m_tar_stream.read_block(header_block);
+    std::cout << header_block;
+    // Make sure that the header members are properly
+    // terminated.
+    TARHeader *header = &header_block.m_header;
+    header->name[sizeof(header->name)-1] = '\0';
+    header->mode[sizeof(header->mode)-1] = '\0';
+    header->uid[sizeof(header->uid)-1] = '\0';
+    header->gid[sizeof(header->gid)-1] = '\0';
+    header->size[sizeof(header->size)-1] = '\0';
+    header->mtime[sizeof(header->mtime)-1] = '\0';
+    header->chksum[sizeof(header->chksum)-1] = '\0';
+    header->linkname[sizeof(header->linkname)-1] = '\0';
+    header->magic[sizeof(header->magic)-1] = '\0';
+    header->version[sizeof(header->version)-1] = '\0';
+    header->uname[sizeof(header->uname)-1] = '\0';
+    header->gname[sizeof(header->gname)-1] = '\0';
+    header->devmajor[sizeof(header->devmajor)-1] = '\0';
+    header->devminor[sizeof(header->devminor)-1] = '\0';
+    header->prefix[sizeof(header->prefix)-1] = '\0';
+
+
+    std::uint32_t size = std::stoi(header->size);
+    std::cout << "size " << size << '\n';
+
+    std::uint32_t data_blocks = size/BLOCK_SIZE;
+    if (size%BLOCK_SIZE)
+        data_blocks++;
+
+    file.push_back(header_block);
+    for (std::uint32_t i = 0; i < data_blocks; ++i)
+    {
+        TARBlock block;
+        if (m_tar_stream.read_block(block) != Status::TAR_OK)
+            return {}; // should not happen since the blocks must exist
+        file.push_back(block);
+    }
+    return file;
 }
