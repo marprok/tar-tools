@@ -80,29 +80,15 @@ TARFile TARParser::get_next_file()
     TARFile file;
     TARBlock header_block;
 
-    m_tar_stream.read_block(header_block);
-    std::cout << header_block;
+    if (m_tar_stream.read_block(header_block) != Status::TAR_OK)
+        return {};
 
-    TARHeader *header = &header_block.m_header;
+    //std::cout << header_block;
+
     _secure_header(header_block.m_header);
+    auto bytes = _unpack(header_block.m_header);
 
-
-    std::uint32_t size = std::stoi(header->size);
-    std::cout << "size " << size << '\n';
-
-    std::uint32_t data_blocks = size/BLOCK_SIZE;
-    if (size%BLOCK_SIZE)
-        data_blocks++;
-
-    file.push_back(header_block);
-    for (std::uint32_t i = 0; i < data_blocks; ++i)
-    {
-        TARBlock block;
-        if (m_tar_stream.read_block(block) != Status::TAR_OK)
-            return {}; // should not happen since the blocks must exist
-        file.push_back(block);
-    }
-    return file;
+    return TARFile{header_block.m_header, bytes};
 }
 
 void TARParser::_secure_header(TARHeader &header)
@@ -122,4 +108,36 @@ void TARParser::_secure_header(TARHeader &header)
     header.devmajor[sizeof(header.devmajor)-1] = '\0';
     header.devminor[sizeof(header.devminor)-1] = '\0';
     header.prefix[sizeof(header.prefix)-1] = '\0';
+}
+
+std::vector<std::uint8_t> TARParser::_unpack(const TARHeader& header)
+{
+    std::uint32_t size = std::stoi(header.size, nullptr, 8);
+
+    std::uint32_t data_blocks = size/BLOCK_SIZE;
+    if (size%BLOCK_SIZE)
+        data_blocks++;
+
+    std::vector<std::uint8_t> bytes;
+    int temp = 0;
+    for (std::uint32_t i = 0; i < data_blocks; ++i)
+    {
+        TARBlock block;
+        if (m_tar_stream.read_block(block) != Status::TAR_OK)
+            return {}; // should not happen since the blocks must exist
+
+        if (size)
+        {
+            std::uint32_t bytes_to_copy = BLOCK_SIZE;
+            if (size < BLOCK_SIZE)
+                bytes_to_copy = size;
+
+            bytes.insert(bytes.end(), block.m_data, block.m_data + bytes_to_copy);
+            size -= bytes_to_copy;
+        }
+        temp++;
+    }
+
+    return bytes;
+
 }

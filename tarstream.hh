@@ -46,7 +46,7 @@ struct TARBlock
     friend std::ostream& operator<<(std::ostream& os, const TARBlock& block);
 };
 
-typedef std::vector<TARBlock> TARFile;
+typedef std::tuple<TARHeader, std::vector<std::uint8_t>> TARFile;
 
 enum class Status { TAR_OK, TAR_EOF };
 
@@ -77,10 +77,12 @@ class TARParser
 {
 public:
     TARParser(TARStream &tar_stream);
-
     TARFile get_next_file();
+
 private:
     void _secure_header(TARHeader& header);
+    std::vector<std::uint8_t> _unpack(const TARHeader& header);
+
     TARStream &m_tar_stream;
 };
 
