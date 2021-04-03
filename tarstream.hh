@@ -80,6 +80,7 @@ public:
 
     TARFile get_next_file();
 private:
+    void _secure_header(TARHeader& header);
     TARStream &m_tar_stream;
 };
 

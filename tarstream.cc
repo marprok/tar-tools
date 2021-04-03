@@ -82,24 +82,9 @@ TARFile TARParser::get_next_file()
 
     m_tar_stream.read_block(header_block);
     std::cout << header_block;
-    // Make sure that the header members are properly
-    // terminated.
+
     TARHeader *header = &header_block.m_header;
-    header->name[sizeof(header->name)-1] = '\0';
-    header->mode[sizeof(header->mode)-1] = '\0';
-    header->uid[sizeof(header->uid)-1] = '\0';
-    header->gid[sizeof(header->gid)-1] = '\0';
-    header->size[sizeof(header->size)-1] = '\0';
-    header->mtime[sizeof(header->mtime)-1] = '\0';
-    header->chksum[sizeof(header->chksum)-1] = '\0';
-    header->linkname[sizeof(header->linkname)-1] = '\0';
-    header->magic[sizeof(header->magic)-1] = '\0';
-    header->version[sizeof(header->version)-1] = '\0';
-    header->uname[sizeof(header->uname)-1] = '\0';
-    header->gname[sizeof(header->gname)-1] = '\0';
-    header->devmajor[sizeof(header->devmajor)-1] = '\0';
-    header->devminor[sizeof(header->devminor)-1] = '\0';
-    header->prefix[sizeof(header->prefix)-1] = '\0';
+    _secure_header(header_block.m_header);
 
 
     std::uint32_t size = std::stoi(header->size);
@@ -118,4 +103,23 @@ TARFile TARParser::get_next_file()
         file.push_back(block);
     }
     return file;
+}
+
+void TARParser::_secure_header(TARHeader &header)
+{
+    header.name[sizeof(header.name)-1] = '\0';
+    header.mode[sizeof(header.mode)-1] = '\0';
+    header.uid[sizeof(header.uid)-1] = '\0';
+    header.gid[sizeof(header.gid)-1] = '\0';
+    header.size[sizeof(header.size)-1] = '\0';
+    header.mtime[sizeof(header.mtime)-1] = '\0';
+    header.chksum[sizeof(header.chksum)-1] = '\0';
+    header.linkname[sizeof(header.linkname)-1] = '\0';
+    header.magic[sizeof(header.magic)-1] = '\0';
+    header.version[sizeof(header.version)-1] = '\0';
+    header.uname[sizeof(header.uname)-1] = '\0';
+    header.gname[sizeof(header.gname)-1] = '\0';
+    header.devmajor[sizeof(header.devmajor)-1] = '\0';
+    header.devminor[sizeof(header.devminor)-1] = '\0';
+    header.prefix[sizeof(header.prefix)-1] = '\0';
 }
