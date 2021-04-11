@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <vector>
-#include <tuple>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -46,7 +46,13 @@ struct TARBlock
     friend std::ostream& operator<<(std::ostream& os, const TARBlock& block);
 };
 
-typedef std::tuple<TARHeader, std::vector<std::uint8_t>> TARFile;
+typedef std::unordered_map<std::string, std::string> TARExtended;
+
+struct TARFile
+{
+    TARHeader header;
+    std::vector<std::uint8_t> data;
+};
 
 enum class Status { TAR_OK, TAR_EOF };
 
@@ -78,7 +84,7 @@ class TARParser
 public:
     TARParser(TARStream &tar_stream);
     TARFile get_next_file();
-
+    TARExtended parse_extended(const TARFile &file);
 private:
     void _secure_header(TARHeader& header);
     std::vector<std::uint8_t> _unpack(const TARHeader& header);

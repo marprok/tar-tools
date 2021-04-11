@@ -29,14 +29,17 @@ int main()
     for (auto i : {1,2,3,4})
     {
         auto file = parser.get_next_file();
-        if (std::get<1>(file).size())
+        std::cout << "file " << file.header.name << " was found!\n"
+                  << "File size : " << file.data.size() << '\n';
+        print_heaader(file.header);
+        if (file.header.typeflag == 'x' ||
+            file.header.typeflag == 'g')
         {
-            std::cout << "file " << std::get<0>(file).name << " was found!\n"
-                      << "File size : " << std::get<1>(file).size() << '\n';
-            print_heaader(std::get<0>(file));
-
-            std::cout << "\n\n\n\n\n\n";
+            std::cout << "EXTENDED TAR FORMAT\n";
+            auto extended = parser.parse_extended(file);
+            for (auto pair : extended)
+                std::cout << pair.first << ":" << pair.second << '\n';
         }
-
+        std::cout << "\n\n\n\n\n\n";
     }
 }

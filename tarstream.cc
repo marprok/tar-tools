@@ -1,5 +1,6 @@
 #include <cstring>
 #include <string>
+#include <sstream>
 #include "tarstream.hh"
 
 std::ostream& operator<<(std::ostream& os, const TARBlock& block)
@@ -77,18 +78,40 @@ TARParser::TARParser(TARStream &tar_stream)
 
 TARFile TARParser::get_next_file()
 {
-    TARFile file;
     TARBlock header_block;
-
     if (m_tar_stream.read_block(header_block) != Status::TAR_OK)
         return {};
-
-    //std::cout << header_block;
 
     _secure_header(header_block.m_header);
     auto bytes = _unpack(header_block.m_header);
 
-    return TARFile{header_block.m_header, bytes};
+    return {header_block.m_header, bytes};
+}
+
+TARExtended TARParser::parse_extended(const TARFile &file)
+{
+    if (file.header.typeflag != 'x' && file.header.typeflag != 'g')
+        return {};
+
+    std::string data(file.data.begin(), file.data.end());
+    std::istringstream ss(data);
+    std::unordered_map<std::string, std::string> extended;
+    for (std::string line; std::getline(ss, line);)
+    {
+        auto space_pos = line.find(" ");
+        if (space_pos != std::string::npos)
+        {
+            auto size = line.substr(0, space_pos);
+            auto equals_pos = line.find("=");
+            if (equals_pos != std::string::npos)
+            {
+                auto elem = line.substr(space_pos+1, equals_pos - space_pos - 1);
+                auto value = line.substr(equals_pos+1);
+                extended[elem] = value;
+            }
+        }
+    }
+    return extended;
 }
 
 void TARParser::_secure_header(TARHeader &header)
@@ -137,3 +160,4 @@ std::vector<std::uint8_t> TARParser::_unpack(const TARHeader& header)
 
     return bytes;
 }
+
