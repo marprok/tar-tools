@@ -33,6 +33,8 @@ struct TARHeader
     char devmajor[8];
     char devminor[8];
     char prefix[155];
+
+    friend std::ostream& operator<<(std::ostream& os, const TARHeader& header);
 };
 
 struct TARBlock

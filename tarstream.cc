@@ -3,6 +3,28 @@
 #include <sstream>
 #include "tarstream.hh"
 
+std::ostream& operator<<(std::ostream& os, const TARHeader& header)
+{
+    os << "name: " << header.name << '\n';
+    os << "mode: " << header.mode << '\n';
+    os << "uid: " << header.uid << '\n';
+    os << "gid: " << header.gid << '\n';
+    os << "size: " << header.size << '\n';
+    os << "mtime: " << header.mtime << '\n';
+    os << "checksum: " << header.chksum << '\n';
+    os << "typeflag: " << header.typeflag << '\n';
+    os << "linkname: " << header.linkname << '\n';
+    os << "magic: " << header.magic << '\n';
+    os << "version: " << header.version << '\n';
+    os << "uname: " << header.uname << '\n';
+    os << "gname: " << header.gname << '\n';
+    os << "devmajor: " << header.devmajor << '\n';
+    os << "devminor: " << header.devminor << '\n';
+    os << "prefix: " << header.prefix << '\n';
+
+    return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const TARBlock& block)
 {
     for (std::uint32_t i = 0; i < BLOCK_SIZE; ++i)
@@ -12,7 +34,6 @@ std::ostream& operator<<(std::ostream& os, const TARBlock& block)
         else
             os << ".";
     }
-    os << '\n';
     return os;
 }
 
