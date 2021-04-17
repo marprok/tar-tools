@@ -56,13 +56,13 @@ struct TARFile
     std::vector<std::uint8_t> data;
 };
 
-enum class Status { TAR_OK, TAR_EOF };
+enum class Status { TAR_OK, TAR_EOF, TAR_ERROR };
 
 class TARStream
 {
 public:
     TARStream(fs::path file_path, std::uint32_t blocking_factor = 20 );
-    ~TARStream();
+    ~TARStream() = default;
 
     TARStream(const TARStream& other) = delete;
     TARStream& operator=(const TARStream& other) = delete;
@@ -73,7 +73,7 @@ private:
     std::uint32_t m_blocking_factor;
     std::uint32_t m_block_id;
     std::uint32_t m_record_id;
-    std::uint8_t* m_record;
+    std::vector<std::uint8_t> m_record;
     std::fstream m_stream;
     std::uint32_t m_records_in_file;
 

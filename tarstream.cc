@@ -1,6 +1,8 @@
 #include <cstring>
 #include <string>
 #include <sstream>
+#include <iterator>
+#include <algorithm>
 #include "tarstream.hh"
 
 std::ostream& operator<<(std::ostream& os, const TARHeader& header)
@@ -40,24 +42,14 @@ std::ostream& operator<<(std::ostream& os, const TARBlock& block)
 TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
     :m_blocking_factor(blocking_factor),
      m_block_id(m_blocking_factor),
-     m_record_id(0),
-     m_record(nullptr)
+     m_record_id(0)
 {
     m_file_path = fs::absolute(file_path);
     m_records_in_file = fs::file_size(m_file_path)/(m_blocking_factor*BLOCK_SIZE);
     std::cout << m_records_in_file << " records in file\n";
-    m_stream.open(m_file_path);
+    m_stream.open(m_file_path, std::ios::in | std::ios::binary);
     if (!m_stream)
         throw std::runtime_error("Could not open file"); // let the caller handle the case
-}
-
-TARStream::~TARStream()
-{
-    if (m_record)
-    {
-        delete[] m_record;
-        m_record = nullptr;
-    }
 }
 
 Status TARStream::read_block(TARBlock& raw)
@@ -69,7 +61,9 @@ Status TARStream::read_block(TARBlock& raw)
         m_block_id = 0;
     }
 
-    std::memcpy(raw.m_data, m_record + m_block_id*BLOCK_SIZE, BLOCK_SIZE);
+    auto from = m_record.begin() + m_block_id*BLOCK_SIZE;
+    auto to = from + BLOCK_SIZE;
+    std::copy(from, to, raw.m_data);
     m_block_id++;
 
     return Status::TAR_OK;
@@ -77,14 +71,14 @@ Status TARStream::read_block(TARBlock& raw)
 
 Status TARStream::_fetch_record()
 {
-    if (!m_record)
-        m_record = new std::uint8_t[BLOCK_SIZE*m_blocking_factor]; // let it fail
-    else
-        m_record_id++;
+    if (m_record.capacity() < BLOCK_SIZE*m_blocking_factor)
+        m_record.reserve(BLOCK_SIZE*m_blocking_factor);
 
     if (m_record_id < m_records_in_file)
     {
-        m_stream.read(reinterpret_cast<char*>(m_record), BLOCK_SIZE*m_blocking_factor);
+        m_record_id = m_stream.tellg() / (BLOCK_SIZE*m_blocking_factor);
+        m_stream.read(reinterpret_cast<char*>(m_record.data()),
+                      BLOCK_SIZE*m_blocking_factor);
         return Status::TAR_OK;
     }
 

@@ -6,7 +6,7 @@ int main()
     TARStream tar("linux-5.12-rc4.tar");
     TARParser parser(tar);
 
-    for (auto i : {1,2,3,4})
+    for (int i = 0; i < 40; ++i)
     {
         auto file = parser.get_next_file();
         std::cout << "file " << file.header.name << " was found!\n"
