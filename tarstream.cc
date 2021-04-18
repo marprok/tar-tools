@@ -151,15 +151,20 @@ TARParser::TARParser(TARStream &tar_stream)
 {
 }
 
-TARFile TARParser::get_next_file()
+Status TARParser::get_next_file(TARFile& file)
 {
     TARBlock header_block;
-    if (m_tar.read_block(header_block) != Status::TAR_OK)
-        return {};
+    Status status = m_tar.read_block(header_block);
+    if (status != Status::TAR_OK)
+        return status;
 
     _secure_header(header_block.m_header);
 
-    return {header_block.m_header, m_tar.block_id(), m_tar.record_id()};
+    file.header = header_block.m_header; // deep copy
+    file.m_block_id = m_tar.block_id();
+    file.m_record_id = m_tar.record_id();
+
+    return Status::TAR_OK;
 }
 
 TARData TARParser::read_file(TARFile& file)
@@ -170,21 +175,26 @@ TARData TARParser::read_file(TARFile& file)
    return _unpack(file.header);
 }
 
-std::vector<TARFile> TARParser::list_files()
+Status TARParser::list_files(TARList& list)
 {
     m_tar.seek_record(0);
-    std::vector<TARFile> files;
+    list.clear();
     while (1)
     {
-        auto file = get_next_file();
+        TARFile file;
+        Status status = get_next_file(file);
+        if (status != Status::TAR_OK)
+            return status;
+
         if (!*file.header.name)
             break;
+
         std::uint32_t data_blocks = file.header.size_in_blocks();
         m_tar.skip_blocks(data_blocks);
-        files.push_back(file);
+        list.push_back(file);
     }
 
-    return files;
+    return Status::TAR_OK;
 }
 
 #if 0

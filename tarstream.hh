@@ -8,6 +8,8 @@
 #include <vector>
 #include <unordered_map>
 
+enum class Status { TAR_OK, TAR_EOF, TAR_ERROR };
+
 namespace fs = std::filesystem;
 typedef std::unordered_map<std::string, std::string> TARExtended;
 typedef std::vector<std::uint8_t> TARData;
@@ -56,11 +58,14 @@ struct TARBlock
 struct TARFile
 {
     TARHeader header;
+private:
     std::uint32_t m_block_id;
     std::uint32_t m_record_id;
+
+    friend class TARParser;
 };
 
-enum class Status { TAR_OK, TAR_EOF, TAR_ERROR };
+typedef std::vector<TARFile> TARList;
 
 class TARStream
 {
@@ -94,10 +99,10 @@ class TARParser
 {
 public:
     TARParser(TARStream &tar_stream);
-    TARFile get_next_file();
+    Status get_next_file(TARFile& file);
     TARData read_file(TARFile& file);
     TARExtended parse_extended(const TARFile &file);
-    std::vector<TARFile> list_files();
+    Status list_files(TARList& list);
 private:
     void _secure_header(TARHeader& header);
     TARData _unpack(const TARHeader& header);

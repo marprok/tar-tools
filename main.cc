@@ -21,7 +21,13 @@ int main()
         std::cout << "\n\n\n\n\n\n";
     }
 */
-    auto files = parser.list_files();
+    TARList files;
+    auto status = parser.list_files(files);
+    if (status != Status::TAR_OK)
+    {
+        std::cerr << "Error listing files\n";
+        return 1;
+    }
     std::cout << files.size() << " files found\n";
     for (auto& file : files)
         std::cout << file.header.name << '\n';
