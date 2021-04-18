@@ -39,6 +39,30 @@ std::ostream& operator<<(std::ostream& os, const TARBlock& block)
     return os;
 }
 
+std::uint32_t TARBlock::calculate_checksum() const
+{
+    std::uint32_t sum = 0;
+    const std::uint8_t* chksum = reinterpret_cast<const uint8_t*>(m_header.chksum);
+    for (std::uint16_t i = 0; i < BLOCK_SIZE; ++i)
+    {
+        if (&m_data[i] >= chksum &&
+            &m_data[i] < (chksum + sizeof(m_header.chksum)))
+            sum+=' ';
+        else
+            sum += m_data[i];
+    }
+    return sum;
+}
+
+bool TARBlock::is_zero_block() const
+{
+    std::uint32_t sum = 0;
+    for (std::uint16_t i = 0; i < BLOCK_SIZE; ++i)
+        sum += m_data[i];
+
+    return sum == 0;
+}
+
 std::uint32_t TARHeader::size_in_blocks() const
 {
     std::uint32_t bytes = std::stoi(size, nullptr, 8);
@@ -159,7 +183,10 @@ Status TARParser::next_file(TARFile& file)
     if (status != Status::TAR_OK)
         return status;
 
-    _secure_header(header_block.m_header);
+    if (header_block.is_zero_block())
+        return Status::TAR_EOF;
+    if (!_check_block(header_block))
+        return Status::TAR_ERROR;
 
     file.header = header_block.m_header; // deep copy
     file.m_block_id = m_tar.block_id();
@@ -184,11 +211,10 @@ Status TARParser::list_files(TARList& list)
     {
         TARFile file;
         Status status = next_file(file);
-        if (status != Status::TAR_OK)
+        if (status == Status::TAR_EOF)
+            return Status::TAR_OK;
+        else if (status != Status::TAR_OK)
             return status;
-
-        if (!*file.header.name)
-            break;
 
         std::uint32_t data_blocks = file.header.size_in_blocks();
         m_tar.skip_blocks(data_blocks);
@@ -225,23 +251,31 @@ TARExtended TARParser::parse_extended(const TARFile &file)
     return extended;
 }
 #endif
-void TARParser::_secure_header(TARHeader &header)
+bool TARParser::_check_block(TARBlock &block)
 {
-    header.name[sizeof(header.name)-1] = '\0';
-    header.mode[sizeof(header.mode)-1] = '\0';
-    header.uid[sizeof(header.uid)-1] = '\0';
-    header.gid[sizeof(header.gid)-1] = '\0';
-    header.size[sizeof(header.size)-1] = '\0';
-    header.mtime[sizeof(header.mtime)-1] = '\0';
-    header.chksum[sizeof(header.chksum)-1] = '\0';
-    header.linkname[sizeof(header.linkname)-1] = '\0';
-    header.magic[sizeof(header.magic)-1] = '\0';
-    header.version[sizeof(header.version)-1] = '\0';
-    header.uname[sizeof(header.uname)-1] = '\0';
-    header.gname[sizeof(header.gname)-1] = '\0';
-    header.devmajor[sizeof(header.devmajor)-1] = '\0';
-    header.devminor[sizeof(header.devminor)-1] = '\0';
-    header.prefix[sizeof(header.prefix)-1] = '\0';
+    std::uint32_t sum = block.calculate_checksum();
+    std::uint32_t header_sum = std::stoi(block.m_header.chksum, nullptr, 8);
+
+    if (sum != header_sum)
+        return false;
+
+    block.m_header.name[sizeof(block.m_header.name)-1] = '\0';
+    block.m_header.mode[sizeof(block.m_header.mode)-1] = '\0';
+    block.m_header.uid[sizeof(block.m_header.uid)-1] = '\0';
+    block.m_header.gid[sizeof(block.m_header.gid)-1] = '\0';
+    block.m_header.size[sizeof(block.m_header.size)-1] = '\0';
+    block.m_header.mtime[sizeof(block.m_header.mtime)-1] = '\0';
+    block.m_header.chksum[sizeof(block.m_header.chksum)-1] = '\0';
+    block.m_header.linkname[sizeof(block.m_header.linkname)-1] = '\0';
+    block.m_header.magic[sizeof(block.m_header.magic)-1] = '\0';
+    block.m_header.version[sizeof(block.m_header.version)-1] = '\0';
+    block.m_header.uname[sizeof(block.m_header.uname)-1] = '\0';
+    block.m_header.gname[sizeof(block.m_header.gname)-1] = '\0';
+    block.m_header.devmajor[sizeof(block.m_header.devmajor)-1] = '\0';
+    block.m_header.devminor[sizeof(block.m_header.devminor)-1] = '\0';
+    block.m_header.prefix[sizeof(block.m_header.prefix)-1] = '\0';
+
+    return true;
 }
 
 TARData TARParser::_unpack(const TARHeader& header)

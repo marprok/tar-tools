@@ -52,6 +52,8 @@ struct TARBlock
         TARHeader m_header;
     };
 
+    std::uint32_t calculate_checksum() const;
+    bool is_zero_block() const;
     friend std::ostream& operator<<(std::ostream& os, const TARBlock& block);
 };
 
@@ -104,7 +106,7 @@ public:
     TARExtended parse_extended(const TARFile &file);
     Status list_files(TARList& list);
 private:
-    void _secure_header(TARHeader& header);
+    bool _check_block(TARBlock& block);
     TARData _unpack(const TARHeader& header);
 
     TARStream &m_tar;
