@@ -151,7 +151,7 @@ TARParser::TARParser(TARStream &tar_stream)
 {
 }
 
-Status TARParser::get_next_file(TARFile& file)
+Status TARParser::next_file(TARFile& file)
 {
     TARBlock header_block;
     Status status = m_tar.read_block(header_block);
@@ -182,7 +182,7 @@ Status TARParser::list_files(TARList& list)
     while (1)
     {
         TARFile file;
-        Status status = get_next_file(file);
+        Status status = next_file(file);
         if (status != Status::TAR_OK)
             return status;
 

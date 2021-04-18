@@ -99,7 +99,7 @@ class TARParser
 {
 public:
     TARParser(TARStream &tar_stream);
-    Status get_next_file(TARFile& file);
+    Status next_file(TARFile& file);
     TARData read_file(TARFile& file);
     TARExtended parse_extended(const TARFile &file);
     Status list_files(TARList& list);
