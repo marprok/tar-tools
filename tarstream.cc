@@ -65,16 +65,37 @@ TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
     m_file_path = fs::absolute(file_path);
     m_records_in_file = fs::file_size(m_file_path)/(m_blocking_factor*BLOCK_SIZE);
     std::cout << m_records_in_file << " records in file\n";
+
     m_stream.open(m_file_path, std::ios::in | std::ios::binary);
     if (!m_stream)
         throw std::runtime_error("Could not open file"); // let the caller handle the case
+
+    m_record.reserve(BLOCK_SIZE*m_blocking_factor);
+}
+
+Status TARStream::_read_record()
+{
+    if (m_record_id < m_records_in_file)
+    {
+        m_record.resize(BLOCK_SIZE*m_blocking_factor);
+        m_stream.read(reinterpret_cast<char*>(m_record.data()),
+                      BLOCK_SIZE*m_blocking_factor);
+
+        if (!m_stream)
+            return Status::TAR_ERROR;
+    }else
+        return Status::TAR_EOF;
+
+    return Status::TAR_OK;
 }
 
 Status TARStream::read_block(TARBlock& raw)
 {
-    if (m_record.capacity() < BLOCK_SIZE*m_blocking_factor)
+    if (m_record.empty())
     {
-        _fetch_record();
+        Status status = _read_record();
+        if (status != Status::TAR_OK)
+            return status;
     }
 
     auto from = m_record.begin() + m_block_id*BLOCK_SIZE;
@@ -84,32 +105,12 @@ Status TARStream::read_block(TARBlock& raw)
 
     if (m_block_id >= m_blocking_factor)
     {
-        if (_fetch_record() == Status::TAR_EOF)
-            return Status::TAR_EOF;
         m_block_id = 0;
+        m_record_id = m_stream.tellg() / (BLOCK_SIZE*m_blocking_factor);
+        m_record.clear(); // leaves the capacity unchanged
     }
 
     return Status::TAR_OK;
-}
-
-Status TARStream::_fetch_record()
-{
-    // cold start
-    if (m_record.capacity() < BLOCK_SIZE*m_blocking_factor)
-    {
-        std::cout << "Reserving\n";
-        m_record.reserve(BLOCK_SIZE*m_blocking_factor);
-    }
-
-    if (m_record_id < m_records_in_file)
-    {
-        m_record_id = m_stream.tellg() / (BLOCK_SIZE*m_blocking_factor);
-        m_stream.read(reinterpret_cast<char*>(m_record.data()),
-                      BLOCK_SIZE*m_blocking_factor);
-        return Status::TAR_OK;
-    }
-
-    return Status::TAR_EOF;
 }
 
 Status TARStream::seek_record(std::uint32_t record_id)
@@ -119,7 +120,7 @@ Status TARStream::seek_record(std::uint32_t record_id)
         return Status::TAR_ERROR;
 
     m_record_id = record_id;
-    if (_fetch_record() != Status::TAR_OK)
+    if (_read_record() != Status::TAR_OK)
         return Status::TAR_ERROR;
 
     m_block_id = 0;

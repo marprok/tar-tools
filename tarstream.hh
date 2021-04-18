@@ -92,7 +92,7 @@ private:
     std::uint32_t m_records_in_file;
 
     // Private API
-    Status _fetch_record();
+    Status _read_record();
 };
 
 class TARParser
