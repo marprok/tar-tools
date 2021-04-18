@@ -113,7 +113,7 @@ Status TARStream::_read_record()
     return Status::TAR_OK;
 }
 
-Status TARStream::read_block(TARBlock& raw)
+Status TARStream::read_block(TARBlock& raw, bool advance)
 {
     if (m_record.empty())
     {
@@ -125,7 +125,9 @@ Status TARStream::read_block(TARBlock& raw)
     auto from = m_record.begin() + m_block_id*BLOCK_SIZE;
     auto to = from + BLOCK_SIZE;
     std::copy(from, to, raw.m_data);
-    m_block_id++;
+
+    if (advance)
+        m_block_id++;
 
     if (m_block_id >= m_blocking_factor)
     {
@@ -184,7 +186,15 @@ Status TARParser::next_file(TARFile& file)
         return status;
 
     if (header_block.is_zero_block())
-        return Status::TAR_EOF;
+    {
+        TARBlock block;
+        m_tar.read_block(block, false);
+        if (block.is_zero_block())
+            return Status::TAR_EOF;
+        else
+            return Status::TAR_ERROR;
+    }
+
     if (!_check_block(header_block))
         return Status::TAR_ERROR;
 

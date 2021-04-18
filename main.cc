@@ -30,16 +30,16 @@ int main()
         return 1;
     }
     std::cout << files.size() << " files found\n";
-    for (auto& file : files)
-    {
-        std::cout << file.header.name << '\n';
-        if (!strcmp("linux-5.12-rc4/virt/kvm/coalesced_mmio.h", file.header.name))
+    //for (auto& file : files)
+    //{
+    //   std::cout << file.header.name << '\n';
+        /*if (!strcmp("linux-5.12-rc4/virt/kvm/coalesced_mmio.h", file.header.name))
         {
             auto data = parser.read_file(file);
             for (char c : data)
                 std::cout << c;
             std::cout << '\n';
             break;
-        }
-    }
+            }*/
+    //}
 }

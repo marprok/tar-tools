@@ -78,7 +78,7 @@ public:
     TARStream(const TARStream& other) = delete;
     TARStream& operator=(const TARStream& other) = delete;
 
-    Status read_block(TARBlock& raw);
+    Status read_block(TARBlock& raw, bool advance = true);
     Status seek_record(std::uint32_t record_id);
     Status skip_blocks(std::uint32_t count);
 
