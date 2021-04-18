@@ -39,9 +39,27 @@ std::ostream& operator<<(std::ostream& os, const TARBlock& block)
     return os;
 }
 
+std::uint32_t TARHeader::size_in_blocks() const
+{
+    std::uint32_t bytes = std::stoi(size, nullptr, 8);
+    if (!bytes)
+        return 0;
+
+    std::uint32_t blocks = bytes/BLOCK_SIZE;
+    if (bytes % BLOCK_SIZE)
+        blocks++;
+
+    return blocks;
+}
+
+std::uint32_t TARHeader::size_in_bytes() const
+{
+    return std::stoi(size, nullptr, 8);
+}
+
 TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
     :m_blocking_factor(blocking_factor),
-     m_block_id(m_blocking_factor),
+     m_block_id(0),
      m_record_id(0)
 {
     m_file_path = fs::absolute(file_path);
@@ -54,11 +72,9 @@ TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
 
 Status TARStream::read_block(TARBlock& raw)
 {
-    if (m_block_id >= m_blocking_factor)
+    if (m_record.capacity() < BLOCK_SIZE*m_blocking_factor)
     {
-        if (_fetch_record() == Status::TAR_EOF)
-            return Status::TAR_EOF;
-        m_block_id = 0;
+        _fetch_record();
     }
 
     auto from = m_record.begin() + m_block_id*BLOCK_SIZE;
@@ -66,13 +82,24 @@ Status TARStream::read_block(TARBlock& raw)
     std::copy(from, to, raw.m_data);
     m_block_id++;
 
+    if (m_block_id >= m_blocking_factor)
+    {
+        if (_fetch_record() == Status::TAR_EOF)
+            return Status::TAR_EOF;
+        m_block_id = 0;
+    }
+
     return Status::TAR_OK;
 }
 
 Status TARStream::_fetch_record()
 {
+    // cold start
     if (m_record.capacity() < BLOCK_SIZE*m_blocking_factor)
+    {
+        std::cout << "Reserving\n";
         m_record.reserve(BLOCK_SIZE*m_blocking_factor);
+    }
 
     if (m_record_id < m_records_in_file)
     {
@@ -85,24 +112,82 @@ Status TARStream::_fetch_record()
     return Status::TAR_EOF;
 }
 
+Status TARStream::seek_record(std::uint32_t record_id)
+{
+    m_stream.seekg(record_id*BLOCK_SIZE*m_blocking_factor);
+    if (!m_stream)
+        return Status::TAR_ERROR;
+
+    m_record_id = record_id;
+    if (_fetch_record() != Status::TAR_OK)
+        return Status::TAR_ERROR;
+
+    m_block_id = 0;
+    return Status::TAR_OK;
+}
+
+Status TARStream::skip_blocks(std::uint32_t count)
+{
+    if (m_block_id + count < m_blocking_factor)
+        m_block_id += count;
+    else
+    {
+        // go to the next record(a.k.a align the records)
+        count -= m_blocking_factor - m_block_id;
+        m_record_id += count / m_blocking_factor + 1;
+
+        if (seek_record(m_record_id) != Status::TAR_OK)
+            return Status::TAR_ERROR;
+        m_block_id = count % m_blocking_factor;
+    }
+    return Status::TAR_OK;
+}
+
+std::uint32_t TARStream::record_id() { return m_record_id; }
+std::uint32_t TARStream::block_id() { return m_block_id; }
 
 TARParser::TARParser(TARStream &tar_stream)
-    :m_tar_stream(tar_stream)
+    :m_tar(tar_stream)
 {
 }
 
 TARFile TARParser::get_next_file()
 {
     TARBlock header_block;
-    if (m_tar_stream.read_block(header_block) != Status::TAR_OK)
+    if (m_tar.read_block(header_block) != Status::TAR_OK)
         return {};
 
     _secure_header(header_block.m_header);
-    auto bytes = _unpack(header_block.m_header);
 
-    return {header_block.m_header, bytes};
+    return {header_block.m_header, m_tar.block_id(), m_tar.record_id()};
 }
 
+TARData TARParser::read_file(TARFile& file)
+{
+    m_tar.seek_record(file.m_record_id);
+    m_tar.skip_blocks(file.m_block_id);
+
+   return _unpack(file.header);
+}
+
+std::vector<TARFile> TARParser::list_files()
+{
+    m_tar.seek_record(0);
+    std::vector<TARFile> files;
+    while (1)
+    {
+        auto file = get_next_file();
+        if (!*file.header.name)
+            break;
+        std::uint32_t data_blocks = file.header.size_in_blocks();
+        m_tar.skip_blocks(data_blocks);
+        files.push_back(file);
+    }
+
+    return files;
+}
+
+#if 0
 TARExtended TARParser::parse_extended(const TARFile &file)
 {
     if (file.header.typeflag != 'x' && file.header.typeflag != 'g')
@@ -128,7 +213,7 @@ TARExtended TARParser::parse_extended(const TARFile &file)
     }
     return extended;
 }
-
+#endif
 void TARParser::_secure_header(TARHeader &header)
 {
     header.name[sizeof(header.name)-1] = '\0';
@@ -148,18 +233,17 @@ void TARParser::_secure_header(TARHeader &header)
     header.prefix[sizeof(header.prefix)-1] = '\0';
 }
 
-std::vector<std::uint8_t> TARParser::_unpack(const TARHeader& header)
+TARData TARParser::_unpack(const TARHeader& header)
 {
-    std::uint32_t size = std::stoi(header.size, nullptr, 8);
-    std::uint32_t data_blocks = size/BLOCK_SIZE;
-    if (size%BLOCK_SIZE)
-        data_blocks++;
+    std::uint32_t data_blocks = header.size_in_blocks();
+    std::uint32_t size = header.size_in_bytes();
+    TARData bytes;
+    bytes.reserve(size);
 
-    std::vector<std::uint8_t> bytes;
     for (std::uint32_t i = 0; i < data_blocks; ++i)
     {
         TARBlock block;
-        if (m_tar_stream.read_block(block) != Status::TAR_OK)
+        if (m_tar.read_block(block) != Status::TAR_OK)
             return {}; // should not happen since the blocks must exist
 
         if (size)

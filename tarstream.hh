@@ -9,6 +9,8 @@
 #include <unordered_map>
 
 namespace fs = std::filesystem;
+typedef std::unordered_map<std::string, std::string> TARExtended;
+typedef std::vector<std::uint8_t> TARData;
 
 constexpr std::uint32_t BLOCK_SIZE = 512;
 
@@ -35,6 +37,9 @@ struct TARHeader
     char prefix[155];
 
     friend std::ostream& operator<<(std::ostream& os, const TARHeader& header);
+
+    std::uint32_t size_in_blocks() const;
+    std::uint32_t size_in_bytes() const;
 };
 
 struct TARBlock
@@ -48,12 +53,11 @@ struct TARBlock
     friend std::ostream& operator<<(std::ostream& os, const TARBlock& block);
 };
 
-typedef std::unordered_map<std::string, std::string> TARExtended;
-
 struct TARFile
 {
     TARHeader header;
-    std::vector<std::uint8_t> data;
+    std::uint32_t m_block_id;
+    std::uint32_t m_record_id;
 };
 
 enum class Status { TAR_OK, TAR_EOF, TAR_ERROR };
@@ -68,6 +72,11 @@ public:
     TARStream& operator=(const TARStream& other) = delete;
 
     Status read_block(TARBlock& raw);
+    Status seek_record(std::uint32_t record_id);
+    Status skip_blocks(std::uint32_t count);
+
+    std::uint32_t record_id();
+    std::uint32_t block_id();
 private:
     fs::path m_file_path;
     std::uint32_t m_blocking_factor;
@@ -86,12 +95,14 @@ class TARParser
 public:
     TARParser(TARStream &tar_stream);
     TARFile get_next_file();
+    TARData read_file(TARFile& file);
     TARExtended parse_extended(const TARFile &file);
+    std::vector<TARFile> list_files();
 private:
     void _secure_header(TARHeader& header);
-    std::vector<std::uint8_t> _unpack(const TARHeader& header);
+    TARData _unpack(const TARHeader& header);
 
-    TARStream &m_tar_stream;
+    TARStream &m_tar;
 };
 
 #endif // TARSTREAM_HH
