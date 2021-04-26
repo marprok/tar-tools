@@ -84,7 +84,8 @@ std::uint32_t TARHeader::size_in_bytes() const
 TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
     :m_blocking_factor(blocking_factor),
      m_block_id(0),
-     m_record_id(0)
+     m_record_id(0),
+     m_empty(true)
 {
     m_file_path = fs::absolute(file_path);
     m_records_in_file = fs::file_size(m_file_path)/(m_blocking_factor*BLOCK_SIZE);
@@ -93,20 +94,21 @@ TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
     m_stream.open(m_file_path, std::ios::in | std::ios::binary);
     if (!m_stream)
         throw std::runtime_error("Could not open file"); // let the caller handle the case
-
-    m_record.reserve(BLOCK_SIZE*m_blocking_factor);
 }
 
 Status TARStream::_read_record()
 {
+    if (!m_record)
+        m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
+
     if (m_record_id < m_records_in_file)
     {
-        m_record.resize(BLOCK_SIZE*m_blocking_factor);
-        m_stream.read(reinterpret_cast<char*>(m_record.data()),
+        m_stream.read(reinterpret_cast<char*>(m_record.get()),
                       BLOCK_SIZE*m_blocking_factor);
 
         if (!m_stream)
             return Status::TAR_ERROR;
+        m_empty = false;
     }else
         return Status::TAR_EOF;
 
@@ -115,14 +117,14 @@ Status TARStream::_read_record()
 
 Status TARStream::read_block(TARBlock& raw, bool advance)
 {
-    if (m_record.empty())
+    if (m_empty)
     {
         Status status = _read_record();
         if (status != Status::TAR_OK)
             return status;
     }
 
-    auto from = m_record.begin() + m_block_id*BLOCK_SIZE;
+    auto from = m_record.get() + m_block_id*BLOCK_SIZE;
     auto to = from + BLOCK_SIZE;
     std::copy(from, to, raw.m_data);
 
@@ -133,7 +135,8 @@ Status TARStream::read_block(TARBlock& raw, bool advance)
     {
         m_block_id = 0;
         m_record_id = m_stream.tellg() / (BLOCK_SIZE*m_blocking_factor);
-        m_record.clear(); // leaves the capacity unchanged
+        std::memset(m_record.get(), 0 , BLOCK_SIZE*m_blocking_factor);
+        m_empty = true;
     }
 
     return Status::TAR_OK;

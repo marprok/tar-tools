@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 enum class Status { TAR_OK, TAR_EOF, TAR_ERROR };
 
@@ -36,7 +37,7 @@ struct TARHeader
     char gname[32];
     char devmajor[8];
     char devminor[8];
-    char prefix[155];
+    char prefix[15];
 
     friend std::ostream& operator<<(std::ostream& os, const TARHeader& header);
 
@@ -89,9 +90,10 @@ private:
     std::uint32_t m_blocking_factor;
     std::uint32_t m_block_id;
     std::uint32_t m_record_id;
-    std::vector<std::uint8_t> m_record;
+    std::unique_ptr<std::uint8_t[]> m_record;
     std::fstream m_stream;
     std::uint32_t m_records_in_file;
+    bool m_empty;
 
     // Private API
     Status _read_record();
