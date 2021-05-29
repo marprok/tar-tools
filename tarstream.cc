@@ -56,11 +56,11 @@ std::uint32_t TARBlock::calculate_checksum() const
 
 bool TARBlock::is_zero_block() const
 {
-    std::uint32_t sum = 0;
     for (std::uint16_t i = 0; i < BLOCK_SIZE; ++i)
-        sum += m_data[i];
+        if (m_data[i])
+            return false;
 
-    return sum == 0;
+    return true;
 }
 
 std::uint32_t TARHeader::size_in_blocks() const
