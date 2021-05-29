@@ -93,9 +93,8 @@ private:
     std::unique_ptr<std::uint8_t[]> m_record;
     std::fstream m_stream;
     std::uint32_t m_records_in_file;
-    bool m_empty;
+    bool m_should_read;
 
-    // Private API
     Status _read_record();
 };
 
@@ -103,15 +102,19 @@ class TARParser
 {
 public:
     TARParser(TARStream &tar_stream);
+    ~TARParser() = default;
+
+    TARParser(const TARParser& other) = delete;
+    TARParser& operator=(const TARParser& other) = delete;
+
     Status next_file(TARFile& file);
     TARData read_file(TARFile& file);
-    TARExtended parse_extended(const TARFile &file);
     Status list_files(TARList& list);
 private:
     bool _check_block(TARBlock& block);
     TARData _unpack(const TARHeader& header);
 
-    TARStream &m_tar;
+    TARStream &m_stream;
 };
 
 #endif // TARSTREAM_HH

@@ -29,10 +29,11 @@ int main()
         std::cerr << "Error listing files\n";
         return 1;
     }
+
     std::cout << files.size() << " files found\n";
     for (auto& file : files)
     {
-       std::cout << file.header.name << '\n';
+        //std::cout << file.header << '\n';
         if (!strcmp("linux-5.12-rc4/virt/kvm/coalesced_mmio.h", file.header.name))
         {
             auto data = parser.read_file(file);
