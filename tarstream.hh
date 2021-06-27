@@ -79,8 +79,6 @@ public:
     super(const super& other) = delete;
     super& operator=(const super& other) = delete;
 
-    Status _read_record();
-
 protected:
     fs::path m_file_path;
     std::uint32_t m_blocking_factor;
@@ -109,7 +107,7 @@ private:
     std::uint32_t m_records_in_file;
     bool m_should_read;
 
-
+    Status _read_record();
 };
 
 class TARParser

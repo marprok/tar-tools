@@ -93,26 +93,13 @@ TARStream::TARStream(fs::path file_path, std::uint32_t blocking_factor)
         throw std::runtime_error("Could not open file"); // let the caller handle the case
 }
 
-Status super::_read_record()
-{
-    if (!m_record)
-        m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
-
-    m_stream.read(reinterpret_cast<char*>(m_record.get()),
-                  BLOCK_SIZE*m_blocking_factor);
-
-    if (!m_stream)
-        return Status::TAR_ERROR;
-
-    return Status::TAR_OK;
-}
-
 super::super(std::uint32_t blocking_factor)
     :m_blocking_factor(blocking_factor),
      m_block_id(0),
      m_record_id(0)
 {
 }
+
 Status TARStream::read_block(TARBlock& raw, bool advance)
 {
     if (m_should_read)
@@ -122,7 +109,6 @@ Status TARStream::read_block(TARBlock& raw, bool advance)
             Status status = _read_record();
             if (status != Status::TAR_OK)
                 return status;
-            m_should_read = false;
         }else
             return Status::TAR_EOF;
     }
@@ -145,6 +131,21 @@ Status TARStream::read_block(TARBlock& raw, bool advance)
     return Status::TAR_OK;
 }
 
+Status TARStream::_read_record()
+{
+    if (!m_record)
+        m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
+
+    m_stream.read(reinterpret_cast<char*>(m_record.get()),
+                  BLOCK_SIZE*m_blocking_factor);
+
+    if (!m_stream)
+        return Status::TAR_ERROR;
+
+    m_should_read = false;
+    return Status::TAR_OK;
+}
+
 Status TARStream::seek_record(std::uint32_t record_id)
 {
     m_stream.seekg(record_id*BLOCK_SIZE*m_blocking_factor);
@@ -155,7 +156,6 @@ Status TARStream::seek_record(std::uint32_t record_id)
     if (_read_record() != Status::TAR_OK)
         return Status::TAR_ERROR;
 
-    m_should_read = false;
     m_block_id = 0;
     return Status::TAR_OK;
 }
