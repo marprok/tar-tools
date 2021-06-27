@@ -70,7 +70,27 @@ private:
 
 typedef std::vector<TARFile> TARList;
 
-class TARStream
+class super
+{
+public:
+    super(std::uint32_t blocking_factor = 20 );
+    virtual ~super() = default;
+
+    super(const super& other) = delete;
+    super& operator=(const super& other) = delete;
+
+    Status _read_record();
+
+protected:
+    fs::path m_file_path;
+    std::uint32_t m_blocking_factor;
+    std::uint32_t m_block_id;
+    std::uint32_t m_record_id;
+    std::unique_ptr<std::uint8_t[]> m_record;
+    std::fstream m_stream;
+};
+
+class TARStream : public super
 {
 public:
     TARStream(fs::path file_path, std::uint32_t blocking_factor = 20 );
@@ -86,16 +106,10 @@ public:
     std::uint32_t record_id();
     std::uint32_t block_id();
 private:
-    fs::path m_file_path;
-    std::uint32_t m_blocking_factor;
-    std::uint32_t m_block_id;
-    std::uint32_t m_record_id;
-    std::unique_ptr<std::uint8_t[]> m_record;
-    std::fstream m_stream;
     std::uint32_t m_records_in_file;
     bool m_should_read;
 
-    Status _read_record();
+
 };
 
 class TARParser
