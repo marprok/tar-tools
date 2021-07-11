@@ -4,8 +4,8 @@
 
 int main()
 {
-    TARStream tar("linux-5.12-rc4.tar");
-    TARParser parser(tar);
+    TAR::IStream tar("linux-5.12-rc4.tar");
+    TAR::Parser parser(tar);
 /*
     for (int i = 0; i < 40; ++i)
     {
@@ -22,9 +22,9 @@ int main()
         std::cout << "\n\n\n\n\n\n";
     }
 */
-    TARList files;
-    auto status = parser.list_files(files);
-    if (status != Status::TAR_OK)
+    TAR::TARList files;
+    auto st = parser.list_files(files);
+    if (st != TAR::Status::OK)
     {
         std::cerr << "Error listing files\n";
         return 1;

@@ -8,125 +8,128 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
+#include <type_traits>
 
-enum class Status { TAR_OK, TAR_EOF, TAR_ERROR };
-
-namespace fs = std::filesystem;
-typedef std::unordered_map<std::string, std::string> TARExtended;
-typedef std::vector<std::uint8_t> TARData;
-
-constexpr std::uint32_t BLOCK_SIZE = 512;
-
-/*
- * The header block(POSIX 1003.1-1990)
- */
-struct TARHeader
+namespace TAR
 {
-    char name[100];
-    char mode[8];
-    char uid[8];
-    char gid[8];
-    char size[12];
-    char mtime[12];
-    char chksum[8];
-    char typeflag;
-    char linkname[100];
-    char magic[6];
-    char version[2];
-    char uname[32];
-    char gname[32];
-    char devmajor[8];
-    char devminor[8];
-    char prefix[15];
+    enum class Status { OK, END, ERROR };
 
-    friend std::ostream& operator<<(std::ostream& os, const TARHeader& header);
+    namespace fs = std::filesystem;
 
-    std::uint32_t size_in_blocks() const;
-    std::uint32_t size_in_bytes() const;
-};
+    typedef std::vector<std::uint8_t> Data;
 
-struct TARBlock
-{
-    union
+    constexpr std::uint32_t BLOCK_SIZE = 512;
+
+  /*
+   * The header block(POSIX 1003.1-1990)
+   */
+    struct Header
     {
-        std::uint8_t m_data[BLOCK_SIZE];
-        TARHeader m_header;
+        char name[100];
+        char mode[8];
+        char uid[8];
+        char gid[8];
+        char size[12];
+        char mtime[12];
+        char chksum[8];
+        char typeflag;
+        char linkname[100];
+        char magic[6];
+        char version[2];
+        char uname[32];
+        char gname[32];
+        char devmajor[8];
+        char devminor[8];
+        char prefix[15];
+
+        friend std::ostream& operator<<(std::ostream& os, const Header& header);
+
+        std::uint32_t size_in_blocks() const;
+        std::uint32_t size_in_bytes() const;
     };
 
-    std::uint32_t calculate_checksum() const;
-    bool is_zero_block() const;
-    friend std::ostream& operator<<(std::ostream& os, const TARBlock& block);
-};
+    struct Block
+    {
+        union
+        {
+            std::uint8_t m_data[BLOCK_SIZE];
+            Header m_header;
+        };
 
-struct TARFile
-{
-    TARHeader header;
-private:
-    std::uint32_t m_block_id;
-    std::uint32_t m_record_id;
+        std::uint32_t calculate_checksum() const;
+        bool is_zero_block() const;
+        friend std::ostream& operator<<(std::ostream& os, const Block& block);
+    };
 
-    friend class TARParser;
-};
+    struct File
+    {
+        Header header;
+    private:
+        std::uint32_t m_block_id;
+        std::uint32_t m_record_id;
 
-typedef std::vector<TARFile> TARList;
+        friend class Parser;
+    };
 
-class super
-{
-public:
-    super(std::uint32_t blocking_factor = 20 );
-    virtual ~super() = default;
+    typedef std::vector<File> TARList;
 
-    super(const super& other) = delete;
-    super& operator=(const super& other) = delete;
+    class BlockStream
+    {
+    public:
+        BlockStream(std::uint32_t blocking_factor = 20 );
+        virtual ~BlockStream() = default;
 
-protected:
-    fs::path m_file_path;
-    std::uint32_t m_blocking_factor;
-    std::uint32_t m_block_id;
-    std::uint32_t m_record_id;
-    std::unique_ptr<std::uint8_t[]> m_record;
-    std::fstream m_stream;
-};
+        BlockStream(const BlockStream& other) = delete;
+        BlockStream& operator=(const BlockStream& other) = delete;
 
-class TARStream : public super
-{
-public:
-    TARStream(fs::path file_path, std::uint32_t blocking_factor = 20 );
-    ~TARStream() = default;
+    protected:
+        fs::path m_file_path;
+        std::uint32_t m_blocking_factor;
+        std::uint32_t m_block_id;
+        std::uint32_t m_record_id;
+        std::unique_ptr<std::uint8_t[]> m_record;
+        std::fstream m_stream;
+    };
 
-    TARStream(const TARStream& other) = delete;
-    TARStream& operator=(const TARStream& other) = delete;
+    class IStream : public BlockStream
+    {
+    public:
+        IStream(fs::path file_path, std::uint32_t blocking_factor = 20 );
+        ~IStream() = default;
 
-    Status read_block(TARBlock& raw, bool advance = true);
-    Status seek_record(std::uint32_t record_id);
-    Status skip_blocks(std::uint32_t count);
+        IStream(const IStream& other) = delete;
+        IStream& operator=(const IStream& other) = delete;
 
-    std::uint32_t record_id();
-    std::uint32_t block_id();
-private:
-    std::uint32_t m_records_in_file;
-    bool m_should_read;
+        Status read_block(Block& raw, bool advance = true);
+        Status seek_record(std::uint32_t record_id);
+        Status skip_blocks(std::uint32_t count);
 
-    Status _read_record();
-};
+        std::uint32_t record_id();
+        std::uint32_t block_id();
+    private:
+        std::uint32_t m_records_in_file;
+        bool m_should_read;
 
-class TARParser
-{
-public:
-    TARParser(TARStream &tar_stream);
-    ~TARParser() = default;
+        Status _read_record();
+    };
 
-    TARParser(const TARParser& other) = delete;
-    TARParser& operator=(const TARParser& other) = delete;
+    class Parser
+    {
+    public:
+        Parser(IStream &tar_stream);
+        ~Parser() = default;
 
-    Status next_file(TARFile& file);
-    TARData read_file(TARFile& file);
-    Status list_files(TARList& list);
-private:
-    bool _check_block(TARBlock& block);
-    TARData _unpack(const TARHeader& header);
+        Parser(const Parser& other) = delete;
+        Parser& operator=(const Parser& other) = delete;
 
-    TARStream &m_stream;
-};
+        Status next_file(File& file);
+        Data read_file(File& file);
+        Status list_files(TARList& list);
+    private:
+        bool _check_block(Block& block);
+        Data _unpack(const Header& header);
 
+        IStream &m_stream;
+    };
+}
 #endif // TARSTREAM_HH
