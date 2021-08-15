@@ -52,8 +52,8 @@ namespace TAR
     {
         union
         {
-            std::uint8_t m_data[BLOCK_SIZE];
-            Header m_header;
+            std::uint8_t as_data[BLOCK_SIZE];
+            Header as_header;
         };
 
         std::uint32_t calculate_checksum() const;

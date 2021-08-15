@@ -35,8 +35,8 @@ namespace TAR
     {
         for (std::uint32_t i = 0; i < BLOCK_SIZE; ++i)
         {
-            if (block.m_data[i])
-                os << static_cast<char>(block.m_data[i]);
+            if (block.as_data[i])
+                os << static_cast<char>(block.as_data[i]);
             else
                 os << ".";
         }
@@ -46,14 +46,14 @@ namespace TAR
     std::uint32_t Block::calculate_checksum() const
     {
         std::uint32_t sum = 0;
-        const std::uint8_t* chksum = reinterpret_cast<const uint8_t*>(m_header.chksum);
+        const std::uint8_t* chksum = reinterpret_cast<const uint8_t*>(as_header.chksum);
         for (std::uint16_t i = 0; i < BLOCK_SIZE; ++i)
         {
-            if (&m_data[i] >= chksum &&
-                &m_data[i] < (chksum + sizeof(m_header.chksum)))
+            if (&as_data[i] >= chksum &&
+                &as_data[i] < (chksum + sizeof(as_header.chksum)))
                 sum+=' ';
             else
-                sum += m_data[i];
+                sum += as_data[i];
         }
         return sum;
     }
@@ -61,7 +61,7 @@ namespace TAR
     bool Block::is_zero_block() const
     {
         for (std::uint16_t i = 0; i < BLOCK_SIZE; ++i)
-            if (m_data[i])
+            if (as_data[i])
                 return false;
 
         return true;
@@ -119,7 +119,7 @@ namespace TAR
 
         auto from = m_record.get() + m_block_id*BLOCK_SIZE;
         auto to = from + BLOCK_SIZE;
-        std::copy(from, to, raw.m_data);
+        std::copy(from, to, raw.as_data);
 
         if (advance)
             m_block_id++;
@@ -211,7 +211,7 @@ namespace TAR
         if (!_check_block(header_block))
             return Status::ERROR;
 
-        file.header = header_block.m_header; // deep copy
+        file.header = header_block.as_header; // deep copy
         file.m_block_id = m_stream.block_id();
         file.m_record_id = m_stream.record_id();
 
@@ -251,26 +251,26 @@ namespace TAR
     bool Parser::_check_block(Block &block)
     {
         std::uint32_t sum = block.calculate_checksum();
-        std::uint32_t header_sum = std::stoi(block.m_header.chksum, nullptr, 8);
+        std::uint32_t header_sum = std::stoi(block.as_header.chksum, nullptr, 8);
 
         if (sum != header_sum)
             return false;
 
-        block.m_header.name[sizeof(block.m_header.name)-1] = '\0';
-        block.m_header.mode[sizeof(block.m_header.mode)-1] = '\0';
-        block.m_header.uid[sizeof(block.m_header.uid)-1] = '\0';
-        block.m_header.gid[sizeof(block.m_header.gid)-1] = '\0';
-        block.m_header.size[sizeof(block.m_header.size)-1] = '\0';
-        block.m_header.mtime[sizeof(block.m_header.mtime)-1] = '\0';
-        block.m_header.chksum[sizeof(block.m_header.chksum)-1] = '\0';
-        block.m_header.linkname[sizeof(block.m_header.linkname)-1] = '\0';
-        block.m_header.magic[sizeof(block.m_header.magic)-1] = '\0';
-        block.m_header.version[sizeof(block.m_header.version)-1] = '\0';
-        block.m_header.uname[sizeof(block.m_header.uname)-1] = '\0';
-        block.m_header.gname[sizeof(block.m_header.gname)-1] = '\0';
-        block.m_header.devmajor[sizeof(block.m_header.devmajor)-1] = '\0';
-        block.m_header.devminor[sizeof(block.m_header.devminor)-1] = '\0';
-        block.m_header.prefix[sizeof(block.m_header.prefix)-1] = '\0';
+        block.as_header.name[sizeof(block.as_header.name)-1] = '\0';
+        block.as_header.mode[sizeof(block.as_header.mode)-1] = '\0';
+        block.as_header.uid[sizeof(block.as_header.uid)-1] = '\0';
+        block.as_header.gid[sizeof(block.as_header.gid)-1] = '\0';
+        block.as_header.size[sizeof(block.as_header.size)-1] = '\0';
+        block.as_header.mtime[sizeof(block.as_header.mtime)-1] = '\0';
+        block.as_header.chksum[sizeof(block.as_header.chksum)-1] = '\0';
+        block.as_header.linkname[sizeof(block.as_header.linkname)-1] = '\0';
+        block.as_header.magic[sizeof(block.as_header.magic)-1] = '\0';
+        block.as_header.version[sizeof(block.as_header.version)-1] = '\0';
+        block.as_header.uname[sizeof(block.as_header.uname)-1] = '\0';
+        block.as_header.gname[sizeof(block.as_header.gname)-1] = '\0';
+        block.as_header.devmajor[sizeof(block.as_header.devmajor)-1] = '\0';
+        block.as_header.devminor[sizeof(block.as_header.devminor)-1] = '\0';
+        block.as_header.prefix[sizeof(block.as_header.prefix)-1] = '\0';
 
         return true;
     }
@@ -294,7 +294,7 @@ namespace TAR
                 if (size < BLOCK_SIZE)
                     bytes_to_copy = size;
 
-                bytes.insert(bytes.end(), block.m_data, block.m_data + bytes_to_copy);
+                bytes.insert(bytes.end(), block.as_data, block.as_data + bytes_to_copy);
                 size -= bytes_to_copy;
             }
         }
