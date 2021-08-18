@@ -92,6 +92,10 @@ namespace TAR
     {
     }
 
+    std::uint32_t BlockStream::record_id() { return m_record_id; }
+    std::uint32_t BlockStream::block_id() { return m_block_id; }
+    void BlockStream::set_file_path(const fs::path& file_path) { m_file_path = file_path; }
+
     IStream::IStream(fs::path file_path, std::uint32_t blocking_factor)
         :BlockStream(blocking_factor),
          m_should_read(true)
@@ -99,7 +103,7 @@ namespace TAR
         m_file_path = fs::absolute(file_path);
         m_records_in_file = fs::file_size(m_file_path)/(m_blocking_factor*BLOCK_SIZE);
         m_stream.open(m_file_path, std::ios::in | std::ios::binary);
-
+        std::cout << m_records_in_file << " record in file\n";
         if (!m_stream)
             throw std::runtime_error("Could not open file"); // let the caller handle the case
     }
@@ -183,9 +187,6 @@ namespace TAR
         return Status::OK;
     }
 
-    std::uint32_t IStream::record_id() { return m_record_id; }
-    std::uint32_t IStream::block_id() { return m_block_id; }
-
     Parser::Parser(IStream &tar_stream)
         :m_stream(tar_stream)
     {
@@ -214,7 +215,7 @@ namespace TAR
         file.header = header_block.as_header; // deep copy
         file.m_block_id = m_stream.block_id();
         file.m_record_id = m_stream.record_id();
-
+        std::cout << "blockid:" << m_stream.block_id() << " is ok\n";
         return Status::OK;
     }
 
@@ -300,5 +301,104 @@ namespace TAR
         }
 
         return bytes;
+    }
+
+    OutStream::OutStream(std::uint32_t blocking_factor)
+        :BlockStream(blocking_factor)
+    {
+    }
+
+    Status OutStream::open_output_file(const fs::path& file_path)
+    {
+        set_file_path(file_path);
+        m_stream.open(m_file_path, std::ios::out | std::ios::binary);
+        if (!m_stream)
+            return Status::ERROR;
+        return Status::OK;
+    }
+
+    void OutStream::close_output_file()
+    {
+        set_file_path({});
+        m_stream.close();
+    }
+
+    Status OutStream::write_block(const Block& block)
+    {
+        if (!m_record)
+        {
+            m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
+            std::memset(m_record.get(), 0, BLOCK_SIZE*m_blocking_factor);
+        }
+
+        if (m_block_id >= m_blocking_factor)
+        {
+            std::cout<< "flushing\n";
+            if (_flush_record() != Status::OK)
+                return Status::ERROR;
+            m_block_id = 0;
+            m_record_id++;
+        }
+
+        std::copy(block.as_data, block.as_data + BLOCK_SIZE,
+                  m_record.get() + m_block_id*BLOCK_SIZE);
+        m_block_id++;
+        return Status::OK;
+    }
+
+    Status OutStream::write_blocks(const std::vector<Block>& blocks)
+    {
+        for (const auto& block : blocks)
+        {
+            std::cout << "writing..\n";
+            if (write_block(block) != Status::OK)
+                return Status::ERROR;
+        }
+
+        if (m_block_id != 0)
+            _flush_record();
+
+        return Status::OK;
+    }
+
+    Status OutStream::_flush_record()
+    {
+        if (!m_record)
+            return Status::ERROR;
+
+        m_stream.write(reinterpret_cast<char*>(m_record.get()),
+                      BLOCK_SIZE*m_blocking_factor);
+
+        if (!m_stream)
+            return Status::ERROR;
+
+        std::memset(m_record.get(), 0, BLOCK_SIZE*m_blocking_factor);
+        return Status::OK;
+    }
+
+    Archiver::Archiver(std::uint32_t blocking_factor)
+        :m_stream(blocking_factor)
+    {
+
+    }
+
+    Status Archiver::archive(const fs::path& thing, const fs::path& dest)
+    {
+        if (!fs::exists(thing))
+        {
+            std::cerr << "Entry: " << thing << " does not exist!\n";
+            return Status::ERROR;
+        }
+
+        if (m_stream.open_output_file(dest) != Status::OK)
+            throw std::runtime_error("Could not open file");
+
+        Block zero;
+        std::memset(&zero, 0, sizeof(zero));
+        std::vector<Block> blocks(21, zero);
+        m_stream.write_blocks(blocks);
+
+        m_stream.close_output_file();
+        return Status::OK;
     }
 }

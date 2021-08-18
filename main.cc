@@ -4,7 +4,10 @@
 
 int main()
 {
-    TAR::IStream tar("linux-5.12-rc4.tar");
+    #define TEST_OUT
+    #ifndef TEST_OUT
+    //TAR::IStream tar("linux-5.12-rc4.tar");
+    TAR::IStream tar("dir1.tar");
     TAR::Parser parser(tar);
 /*
     for (int i = 0; i < 40; ++i)
@@ -33,7 +36,7 @@ int main()
     std::cout << files.size() << " files found\n";
     for (auto& file : files)
     {
-        //std::cout << file.header << '\n';
+        std::cout << file.header << '\n';
         if (!strcmp("linux-5.12-rc4/virt/kvm/coalesced_mmio.h", file.header.name))
         {
             auto data = parser.read_file(file);
@@ -43,4 +46,8 @@ int main()
             break;
         }
     }
+    #else
+    TAR::Archiver arc;
+    arc.archive("dir1", "testing.tar");
+    #endif
 }

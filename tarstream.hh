@@ -82,6 +82,10 @@ namespace TAR
         BlockStream(const BlockStream& other) = delete;
         BlockStream& operator=(const BlockStream& other) = delete;
 
+        std::uint32_t record_id();
+        std::uint32_t block_id();
+        void set_file_path(const fs::path& file_path);
+
     protected:
         fs::path m_file_path;
         std::uint32_t m_blocking_factor;
@@ -104,8 +108,6 @@ namespace TAR
         Status seek_record(std::uint32_t record_id);
         Status skip_blocks(std::uint32_t count);
 
-        std::uint32_t record_id();
-        std::uint32_t block_id();
     private:
         std::uint32_t m_records_in_file;
         bool m_should_read;
@@ -130,6 +132,37 @@ namespace TAR
         Data _unpack(const Header& header);
 
         IStream &m_stream;
+    };
+
+    class OutStream : public BlockStream
+    {
+    public:
+        OutStream( std::uint32_t blocking_factor = 20 );
+        ~OutStream() = default;
+
+        OutStream(const OutStream& other) = delete;
+        OutStream& operator=(const OutStream& other) = delete;
+
+        Status open_output_file(const fs::path& file_path);
+        void close_output_file();
+        Status write_block(const Block& block);
+        Status write_blocks(const std::vector<Block>& blocks);
+    private:
+        Status _flush_record();
+    };
+
+    class Archiver
+    {
+    public:
+        Archiver(std::uint32_t blocking_factor = 20);
+        ~Archiver() = default;
+
+        Archiver(const Archiver& other) = delete;
+        Archiver& operator=(const Archiver& other) = delete;
+
+        Status archive(const fs::path& thing, const fs::path& dest);
+    private:
+        OutStream m_stream;
     };
 }
 #endif // TARSTREAM_HH
