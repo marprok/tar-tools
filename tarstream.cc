@@ -3,6 +3,9 @@
 #include <sstream>
 #include <iterator>
 #include <algorithm>
+#include <sys/stat.h>
+#include <pwd.h>
+#include <grp.h>
 #include "tarstream.hh"
 
 namespace TAR
@@ -21,7 +24,7 @@ namespace TAR
         os << "typeflag: " << header.typeflag << '\n';
         os << "linkname: " << header.linkname << '\n';
         os << "magic: " << header.magic << '\n';
-        os << "version: " << header.version << '\n';
+        os << "version: " << header.version[0] << header.version[1] << '\n';
         os << "uname: " << header.uname << '\n';
         os << "gname: " << header.gname << '\n';
         os << "devmajor: " << header.devmajor << '\n';
@@ -144,14 +147,19 @@ namespace TAR
         if (!m_record)
             m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
 
+        // TODO: check that the correct amount of bytes is read
         m_stream.read(reinterpret_cast<char*>(m_record.get()),
                       BLOCK_SIZE*m_blocking_factor);
 
-        if (!m_stream)
-            return Status::ERROR;
-
-        m_should_read = false;
-        return Status::OK;
+        Status st = Status::OK;
+        //std::cout << "gcount: " << m_stream.gcount() << '\n';
+        if (m_stream.gcount() != BLOCK_SIZE*m_blocking_factor)
+            st = Status::END;
+        else if (!m_stream)
+            st = Status::ERROR;
+        else
+            m_should_read = false;
+        return st;
     }
 
     Status IStream::seek_record(std::uint32_t record_id)
@@ -215,7 +223,7 @@ namespace TAR
         file.header = header_block.as_header; // deep copy
         file.m_block_id = m_stream.block_id();
         file.m_record_id = m_stream.record_id();
-        std::cout << "blockid:" << m_stream.block_id() << " is ok\n";
+        //std::cout << "blockid:" << m_stream.block_id() << " is ok\n";
         return Status::OK;
     }
 
@@ -263,10 +271,10 @@ namespace TAR
         block.as_header.gid[sizeof(block.as_header.gid)-1] = '\0';
         block.as_header.size[sizeof(block.as_header.size)-1] = '\0';
         block.as_header.mtime[sizeof(block.as_header.mtime)-1] = '\0';
-        block.as_header.chksum[sizeof(block.as_header.chksum)-1] = '\0';
+        //block.as_header.chksum[sizeof(block.as_header.chksum)-1] = '\0';
         block.as_header.linkname[sizeof(block.as_header.linkname)-1] = '\0';
         block.as_header.magic[sizeof(block.as_header.magic)-1] = '\0';
-        block.as_header.version[sizeof(block.as_header.version)-1] = '\0';
+        //block.as_header.version[sizeof(block.as_header.version)-1] = '\0';
         block.as_header.uname[sizeof(block.as_header.uname)-1] = '\0';
         block.as_header.gname[sizeof(block.as_header.gname)-1] = '\0';
         block.as_header.devmajor[sizeof(block.as_header.devmajor)-1] = '\0';
@@ -371,7 +379,6 @@ namespace TAR
 
         if (!m_stream)
             return Status::ERROR;
-
         std::memset(m_record.get(), 0, BLOCK_SIZE*m_blocking_factor);
         return Status::OK;
     }
@@ -393,12 +400,78 @@ namespace TAR
         if (m_stream.open_output_file(dest) != Status::OK)
             throw std::runtime_error("Could not open file");
 
-        Block zero;
+
+        for(auto const& temp: std::filesystem::directory_iterator{thing})
+        {
+            Block header_block;
+            _create_header(temp.path(), header_block);
+
+            std::cout << header_block.as_header;
+            std::cout << "\n\n";
+        }
+/*        Block zero;
         std::memset(&zero, 0, sizeof(zero));
         std::vector<Block> blocks(21, zero);
         m_stream.write_blocks(blocks);
-
+*/
         m_stream.close_output_file();
+        return Status::OK;
+    }
+
+    Status Archiver::_create_header(const fs::path& path, Block& header_block)
+    {
+        struct stat info;
+        Header& header = header_block.as_header;
+        if (lstat(path.string().c_str(), &info) < 0)
+        {
+            std::cerr << "stat for " << path << " failed\n";
+            return Status::ERROR;
+        }
+        std::memset(&header, 0, sizeof(Header));
+        std::strncpy(header.name, path.string().c_str(), sizeof(header.name) - 1);
+        std::sprintf(header.mode, "%0*o",
+                     (int)sizeof(header.mode) - 1,
+                     info.st_mode & ~S_IFMT);
+        std::sprintf(header.uid, "%0*o",
+                     (int)sizeof(header.uid) - 1,
+                     info.st_uid);
+        std::sprintf(header.gid, "%0*o",
+                     (int)sizeof(header.gid) - 1,
+                     info.st_gid);
+        if (!fs::is_directory(path))
+            std::sprintf(header.size, "%0*lo",
+                         (int)sizeof(header.size) - 1,
+                         info.st_size);
+        else
+            std::memset(header.size, '0', sizeof(header.size) - 1);
+
+        switch (info.st_mode & S_IFMT)
+        {
+            case S_IFREG:  header.typeflag = '0';   break;
+            case S_IFLNK:  header.typeflag = '1';   break;
+            case S_IFCHR:  header.typeflag = '3';  break;
+            case S_IFBLK:  header.typeflag = '4';  break;
+            case S_IFDIR:  header.typeflag = '5';  break;
+            case S_IFIFO:  header.typeflag = '6';  break;
+            case S_IFSOCK: header.typeflag = 0;     break;// what is the correct value?
+        }
+
+        std::sprintf(header.mtime, "%lo", info.st_mtime);
+        std::sprintf(header.magic, "ustar");
+        std::sprintf(header.version, "00");
+
+        struct passwd *pw = getpwuid(info.st_uid);
+        if (pw)
+            std::strncpy(header.uname, pw->pw_name, sizeof(header.uname) - 1);
+
+        struct group  *gr = getgrgid(info.st_gid);
+        if (gr)
+            std::strncpy(header.gname, gr->gr_name, sizeof(header.gname) - 1);
+
+        std::sprintf(header.chksum, "%0*d",
+                     (int)sizeof(header.chksum) - 2,
+                     header_block.calculate_checksum());
+        header.chksum[sizeof(header.chksum)-1] = 0x20;
         return Status::OK;
     }
 }

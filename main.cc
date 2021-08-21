@@ -4,7 +4,7 @@
 
 int main()
 {
-    #define TEST_OUT
+    //#define TEST_OUT
     #ifndef TEST_OUT
     //TAR::IStream tar("linux-5.12-rc4.tar");
     TAR::IStream tar("dir1.tar");
@@ -48,6 +48,6 @@ int main()
     }
     #else
     TAR::Archiver arc;
-    arc.archive("dir1", "testing.tar");
+    arc.archive("dir1", "test");
     #endif
 }

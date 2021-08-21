@@ -162,6 +162,8 @@ namespace TAR
 
         Status archive(const fs::path& thing, const fs::path& dest);
     private:
+
+        Status _create_header(const fs::path& path, Block& header_block);
         OutStream m_stream;
     };
 }
