@@ -147,16 +147,14 @@ namespace TAR
         if (!m_record)
             m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
 
-        // TODO: check that the correct amount of bytes is read
         m_stream.read(reinterpret_cast<char*>(m_record.get()),
                       BLOCK_SIZE*m_blocking_factor);
 
         Status st = Status::OK;
-        //std::cout << "gcount: " << m_stream.gcount() << '\n';
-        if (m_stream.gcount() != BLOCK_SIZE*m_blocking_factor)
-            st = Status::END;
-        else if (!m_stream)
+        if (!m_stream)
             st = Status::ERROR;
+        else if (m_stream.gcount() != BLOCK_SIZE*m_blocking_factor)
+            st = Status::END;
         else
             m_should_read = false;
         return st;
@@ -223,7 +221,7 @@ namespace TAR
         file.header = header_block.as_header; // deep copy
         file.m_block_id = m_stream.block_id();
         file.m_record_id = m_stream.record_id();
-        //std::cout << "blockid:" << m_stream.block_id() << " is ok\n";
+
         return Status::OK;
     }
 
@@ -261,9 +259,11 @@ namespace TAR
     {
         std::uint32_t sum = block.calculate_checksum();
         std::uint32_t header_sum = std::stoi(block.as_header.chksum, nullptr, 8);
-
         if (sum != header_sum)
+        {
+            std::cerr << "not matching checksums!\n";
             return false;
+        }
 
         block.as_header.name[sizeof(block.as_header.name)-1] = '\0';
         block.as_header.mode[sizeof(block.as_header.mode)-1] = '\0';
@@ -341,7 +341,6 @@ namespace TAR
 
         if (m_block_id >= m_blocking_factor)
         {
-            std::cout<< "flushing\n";
             if (_flush_record() != Status::OK)
                 return Status::ERROR;
             m_block_id = 0;
@@ -358,7 +357,6 @@ namespace TAR
     {
         for (const auto& block : blocks)
         {
-            std::cout << "writing..\n";
             if (write_block(block) != Status::OK)
                 return Status::ERROR;
         }
@@ -400,20 +398,16 @@ namespace TAR
         if (m_stream.open_output_file(dest) != Status::OK)
             throw std::runtime_error("Could not open file");
 
-
+        std::vector<Block> blocks;
         for(auto const& temp: std::filesystem::directory_iterator{thing})
         {
             Block header_block;
             _create_header(temp.path(), header_block);
-
+            blocks.push_back(header_block);
             std::cout << header_block.as_header;
             std::cout << "\n\n";
         }
-/*        Block zero;
-        std::memset(&zero, 0, sizeof(zero));
-        std::vector<Block> blocks(21, zero);
         m_stream.write_blocks(blocks);
-*/
         m_stream.close_output_file();
         return Status::OK;
     }
@@ -427,7 +421,7 @@ namespace TAR
             std::cerr << "stat for " << path << " failed\n";
             return Status::ERROR;
         }
-        std::memset(&header, 0, sizeof(Header));
+        std::memset(&header, 0, sizeof(Block));
         std::strncpy(header.name, path.string().c_str(), sizeof(header.name) - 1);
         std::sprintf(header.mode, "%0*o",
                      (int)sizeof(header.mode) - 1,
@@ -458,7 +452,9 @@ namespace TAR
 
         std::sprintf(header.mtime, "%lo", info.st_mtime);
         std::sprintf(header.magic, "ustar");
-        std::sprintf(header.version, "00");
+        //std::sprintf(header.version, "  ");
+        header.version[0] = 0x30;
+        header.version[1] = 0x30;
 
         struct passwd *pw = getpwuid(info.st_uid);
         if (pw)
@@ -468,7 +464,9 @@ namespace TAR
         if (gr)
             std::strncpy(header.gname, gr->gr_name, sizeof(header.gname) - 1);
 
-        std::sprintf(header.chksum, "%0*d",
+        std::memset(header.devmajor, '0', sizeof(header.devmajor) - 1);
+        std::memset(header.devminor, '0', sizeof(header.devminor) - 1);
+        std::sprintf(header.chksum, "%0*o",
                      (int)sizeof(header.chksum) - 2,
                      header_block.calculate_checksum());
         header.chksum[sizeof(header.chksum)-1] = 0x20;
