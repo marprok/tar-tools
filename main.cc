@@ -6,8 +6,8 @@ int main()
 {
 //#define TEST_OUT
     #ifndef TEST_OUT
-    TAR::IStream tar("linux-5.14-rc6.tar");
-    //TAR::IStream tar("dir1.tar");
+    //TAR::InStream tar("linux-5.14-rc6.tar");
+    TAR::InStream tar("dir1.tar");
     TAR::Parser parser(tar);
 /*
     for (int i = 0; i < 40; ++i)

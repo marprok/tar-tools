@@ -95,14 +95,14 @@ namespace TAR
         std::fstream m_stream;
     };
 
-    class IStream : public BlockStream
+    class InStream : public BlockStream
     {
     public:
-        IStream(fs::path file_path, std::uint32_t blocking_factor = 20 );
-        ~IStream() = default;
+        InStream(fs::path file_path, std::uint32_t blocking_factor = 20 );
+        ~InStream() = default;
 
-        IStream(const IStream& other) = delete;
-        IStream& operator=(const IStream& other) = delete;
+        InStream(const InStream& other) = delete;
+        InStream& operator=(const InStream& other) = delete;
 
         Status read_block(Block& raw, bool advance = true);
         Status seek_record(std::uint32_t record_id);
@@ -118,7 +118,7 @@ namespace TAR
     class Parser
     {
     public:
-        Parser(IStream &tar_stream);
+        Parser(InStream &tar_stream);
         ~Parser() = default;
 
         Parser(const Parser& other) = delete;
@@ -131,7 +131,7 @@ namespace TAR
         bool _check_block(Block& block);
         Data _unpack(const Header& header);
 
-        IStream &m_stream;
+        InStream &m_stream;
     };
 
     class OutStream : public BlockStream

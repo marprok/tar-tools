@@ -99,7 +99,7 @@ namespace TAR
     std::uint32_t BlockStream::block_id() { return m_block_id; }
     void BlockStream::set_file_path(const fs::path& file_path) { m_file_path = file_path; }
 
-    IStream::IStream(fs::path file_path, std::uint32_t blocking_factor)
+    InStream::InStream(fs::path file_path, std::uint32_t blocking_factor)
         :BlockStream(blocking_factor),
          m_should_read(true)
     {
@@ -111,7 +111,7 @@ namespace TAR
             throw std::runtime_error("Could not open file"); // let the caller handle the case
     }
 
-    Status IStream::read_block(Block& raw, bool advance)
+    Status InStream::read_block(Block& raw, bool advance)
     {
         if (m_should_read)
         {
@@ -142,7 +142,7 @@ namespace TAR
         return Status::OK;
     }
 
-    Status IStream::_read_record()
+    Status InStream::_read_record()
     {
         if (!m_record)
             m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
@@ -160,7 +160,7 @@ namespace TAR
         return st;
     }
 
-    Status IStream::seek_record(std::uint32_t record_id)
+    Status InStream::seek_record(std::uint32_t record_id)
     {
         m_stream.seekg(record_id*BLOCK_SIZE*m_blocking_factor);
         if (!m_stream)
@@ -174,7 +174,7 @@ namespace TAR
         return Status::OK;
     }
 
-    Status IStream::skip_blocks(std::uint32_t count)
+    Status InStream::skip_blocks(std::uint32_t count)
     {
         if (m_block_id + count < m_blocking_factor)
             m_block_id += count;
@@ -193,7 +193,7 @@ namespace TAR
         return Status::OK;
     }
 
-    Parser::Parser(IStream &tar_stream)
+    Parser::Parser(InStream &tar_stream)
         :m_stream(tar_stream)
     {
     }
