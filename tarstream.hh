@@ -160,10 +160,11 @@ namespace TAR
         Archiver(const Archiver& other) = delete;
         Archiver& operator=(const Archiver& other) = delete;
 
-        Status archive(const fs::path& thing, const fs::path& dest);
+        Status archive(const fs::path& src, const fs::path& dest);
     private:
 
         Status _create_header(const fs::path& path, Block& header_block);
+        Status _pack(const fs::path& path, std::vector<Block>& blocks);
         OutStream m_stream;
     };
 }

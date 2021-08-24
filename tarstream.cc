@@ -1,5 +1,6 @@
 #include <cstring>
 #include <string>
+#include <queue>
 #include <sstream>
 #include <iterator>
 #include <algorithm>
@@ -327,6 +328,8 @@ namespace TAR
 
     void OutStream::close_output_file()
     {
+        if (m_block_id != 0)
+            _flush_record();
         set_file_path({});
         m_stream.close();
     }
@@ -361,8 +364,8 @@ namespace TAR
                 return Status::ERROR;
         }
 
-        if (m_block_id != 0)
-            _flush_record();
+        //if (m_block_id != 0)
+        //    _flush_record();
 
         return Status::OK;
     }
@@ -387,27 +390,42 @@ namespace TAR
 
     }
 
-    Status Archiver::archive(const fs::path& thing, const fs::path& dest)
+    Status Archiver::archive(const fs::path& src, const fs::path& dest)
     {
-        if (!fs::exists(thing))
+        if (!fs::exists(src))
         {
-            std::cerr << "Entry: " << thing << " does not exist!\n";
+            std::cerr << "Entry: " << src << " does not exist!\n";
             return Status::ERROR;
         }
 
         if (m_stream.open_output_file(dest) != Status::OK)
             throw std::runtime_error("Could not open file");
 
-        std::vector<Block> blocks;
-        for(auto const& temp: std::filesystem::directory_iterator{thing})
+        std::queue<fs::path> work;
+        work.push(src);
+        while (!work.empty())
         {
+            const auto& thing = work.front();
             Block header_block;
-            _create_header(temp.path(), header_block);
-            blocks.push_back(header_block);
-            std::cout << header_block.as_header;
-            std::cout << "\n\n";
+            _create_header(thing, header_block);
+            if (fs::is_directory(thing))
+            {
+                for(auto const& entry: std::filesystem::directory_iterator{thing})
+                    work.push(entry.path());
+                m_stream.write_block(header_block);
+            }
+            else
+            {
+                std::vector<Block> blocks;
+                blocks.push_back(header_block);
+                _pack(thing, blocks);
+                m_stream.write_blocks(blocks);
+            }
+            work.pop();
         }
-        m_stream.write_blocks(blocks);
+        Block zeros;
+        std::memset(&zeros, 0, sizeof(Block));
+        m_stream.write_block(zeros);
         m_stream.close_output_file();
         return Status::OK;
     }
@@ -470,6 +488,23 @@ namespace TAR
                      (int)sizeof(header.chksum) - 2,
                      header_block.calculate_checksum());
         header.chksum[sizeof(header.chksum)-1] = 0x20;
+        return Status::OK;
+    }
+
+    Status Archiver::_pack(const fs::path& path, std::vector<Block>& blocks)
+    {
+        std::fstream in(path, std::ios::in | std::ios::binary);
+        std::size_t total_bytes = fs::file_size(path);
+        while (total_bytes > 0)
+        {
+            Block block;
+            std::memset(&block, 0, sizeof(Block));
+            in.read(reinterpret_cast<char*>(block.as_data), sizeof(Block));
+            total_bytes -= in.gcount();
+            if (total_bytes > 0 && !in)
+                return Status::ERROR;
+            blocks.push_back(block);
+        }
         return Status::OK;
     }
 }
