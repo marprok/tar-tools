@@ -108,7 +108,7 @@ namespace TAR
         :BlockStream(blocking_factor),
          m_should_read(true)
     {
-        m_file_path = fs::absolute(file_path);
+        set_file_path(file_path);
         m_records_in_file = fs::file_size(m_file_path)/(m_blocking_factor*BLOCK_SIZE);
 
         m_stream.open(m_file_path, std::ios::in | std::ios::binary);
