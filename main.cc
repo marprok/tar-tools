@@ -4,10 +4,10 @@
 
 int main()
 {
-//#define TEST_OUT
+#define TEST_OUT
     #ifndef TEST_OUT
-    //TAR::InStream tar("linux-5.14-rc6.tar");
-    TAR::InStream tar("dir1.tar");
+    TAR::InStream tar("linux-5.14-rc6.tar");
+    //TAR::InStream tar("dir1.tar");
     TAR::Parser parser(tar);
 /*
     for (int i = 0; i < 40; ++i)
@@ -25,7 +25,7 @@ int main()
         std::cout << "\n\n\n\n\n\n";
     }
 */
-    TAR::TARList files;
+    std::vector<TAR::File> files;
     auto st = parser.list_files(files);
     if (st != TAR::Status::OK)
     {
@@ -37,7 +37,7 @@ int main()
     for (auto& file : files)
     {
         std::cout << file.header << '\n';
-        if (!strcmp("linux-5.12-rc4/virt/kvm/coalesced_mmio.h", file.header.name))
+        if (!strcmp("linux-5.14-rc6/virt/kvm/coalesced_mmio.h", file.header.name))
         {
             auto data = parser.read_file(file);
             for (char c : data)
@@ -48,6 +48,6 @@ int main()
     }
     #else
     TAR::Archiver arc;
-    arc.archive("dir1", "test.tar");
+    arc.archive("popcorn", "marios_popcorn.tar");
     #endif
 }

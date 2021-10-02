@@ -13,16 +13,11 @@
 namespace TAR
 {
     enum class Status { OK, END, ERROR };
-
     namespace fs = std::filesystem;
-
     typedef std::vector<std::uint8_t> Data;
-
     constexpr std::uint32_t BLOCK_SIZE = 512;
 
-  /*
-   * The header block(POSIX 1003.1-1990)
-   */
+   // The header block(POSIX 1003.1-1990)
     struct Header
     {
         char name[100];
@@ -42,10 +37,9 @@ namespace TAR
         char devminor[8];
         char prefix[15];
 
-        friend std::ostream& operator<<(std::ostream& os, const Header& header);
-
         std::uint32_t size_in_blocks() const;
         std::uint32_t size_in_bytes() const;
+        friend std::ostream& operator<<(std::ostream& os, const Header& header);
     };
 
     struct Block
@@ -53,7 +47,7 @@ namespace TAR
         union
         {
             std::uint8_t as_data[BLOCK_SIZE];
-            Header as_header;
+            Header       as_header;
         };
 
         std::uint32_t calculate_checksum() const;
@@ -70,8 +64,6 @@ namespace TAR
 
         friend class Parser;
     };
-
-    typedef std::vector<File> TARList;
 
     class BlockStream
     {
@@ -112,7 +104,7 @@ namespace TAR
         std::uint32_t m_records_in_file;
         bool m_should_read;
 
-        Status _read_record();
+        Status read_record();
     };
 
     class Parser
@@ -126,10 +118,10 @@ namespace TAR
 
         Status next_file(File& file);
         Data read_file(File& file);
-        Status list_files(TARList& list);
+        Status list_files(std::vector<File>& list);
     private:
-        bool _check_block(Block& block);
-        Data _unpack(const Header& header);
+        bool check_block(Block& block);
+        Data unpack(const Header& header);
 
         InStream &m_stream;
     };
@@ -148,7 +140,7 @@ namespace TAR
         Status write_block(const Block& block);
         Status write_blocks(const std::vector<Block>& blocks);
     private:
-        Status _flush_record();
+        Status flush_record();
     };
 
     class Archiver
@@ -163,8 +155,8 @@ namespace TAR
         Status archive(const fs::path& src, const fs::path& dest);
     private:
 
-        Status _create_header(const fs::path& path, Block& header_block);
-        Status _pack(const fs::path& path, std::vector<Block>& blocks);
+        Status create_header(const fs::path& path, Block& header_block);
+        Status pack(const fs::path& path, std::vector<Block>& blocks);
         OutStream m_stream;
     };
 }
