@@ -11,5 +11,11 @@ main.o: main.cc tarstream.hh
 tarstream.o: tarstream.cc tarstream.hh
 	$(CXX) $(CXXFLAGS) -c tarstream.cc -o tarstream.o
 
+archiver: archiver.o tarstream.o
+	$(CXX) -o archiver archiver.o tarstream.o
+
+archiver.o: archiver.cc tarstream.hh
+	$(CXX) $(CXXFLAGS) -c archiver.cc -o archiver.o
+
 clean:
-	rm $(OUTFILE) main.o tarstream.o
+	rm $(OUTFILE) archiver archiver.o main.o tarstream.o
