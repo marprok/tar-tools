@@ -1,4 +1,4 @@
-CXXFLAGS = -Wall -Wextra -std=c++20 -O0
+CXXFLAGS = -Wall -Wextra -std=c++20 -O3
 OUTFILE = main
 CXX = g++
 

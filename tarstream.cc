@@ -82,8 +82,7 @@ namespace TAR
             return 0;
 
         std::uint32_t blocks = bytes / BLOCK_SIZE;
-        if (bytes % BLOCK_SIZE)
-            blocks++;
+        if (bytes % BLOCK_SIZE) blocks++;
 
         return blocks;
     }
@@ -558,8 +557,7 @@ namespace TAR
 
         std::size_t size = name.size();
         std::size_t nBlocks = size/BLOCK_SIZE;
-        if (size % BLOCK_SIZE)
-            nBlocks++;
+        if (size % BLOCK_SIZE) nBlocks++;
 
         const char* pName = name.c_str();
         for (std::size_t i = 0; i < nBlocks; ++i)
@@ -580,17 +578,27 @@ namespace TAR
     {
         std::fstream in(path, std::ios::in | std::ios::binary);
         std::size_t total_bytes = fs::file_size(path);
+        std::size_t total_blocks = total_bytes/BLOCK_SIZE;
 
-        while (total_bytes > 0)
+        if (total_bytes%BLOCK_SIZE) total_blocks++;
+        blocks.reserve(blocks.capacity() + total_blocks);
+
+        std::array<Block, 10> cache;
+        std::size_t blocks_read = 0;
+        while (total_blocks > 0)
         {
-            Block block;
-            std::memset(&block, 0, sizeof(Block));
-            in.read(reinterpret_cast<char*>(block.as_data), sizeof(Block));
-            total_bytes -= in.gcount();
-            if (total_bytes > 0 && !in)
+            std::memset(cache.data(), 0, cache.size()*sizeof(Block));
+            in.read(reinterpret_cast<char*>(cache.data()), cache.size()*sizeof(Block));
+            if (total_blocks > cache.size())
+                blocks_read = cache.size();
+            else
+                blocks_read = total_blocks;
+            total_blocks -= blocks_read;
+
+            if (total_blocks > 0 && !in)
                 return Status::ERROR;
 
-            blocks.push_back(block);
+            blocks.insert(blocks.end(), cache.begin(), cache.begin() + blocks_read);
         }
 
         return Status::OK;
