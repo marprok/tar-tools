@@ -428,21 +428,27 @@ namespace TAR
             const auto& thing = to_be_visited.front();
             Block header_block;
             create_header(thing, header_block);
+            std::vector<Block> blocks;
+            // Handle the case of too long names
+            if (thing.string().size() > 99)
+                create_long_name_blocks(thing.string(), blocks, header_block.as_header);
 
             if (fs::is_directory(thing))
             {
                 for(auto const& entry: std::filesystem::directory_iterator{thing})
                     to_be_visited.push(entry.path());
-                m_stream.write_block(header_block);
+                blocks.push_back(header_block);
             }
             else
             {
-                std::vector<Block> blocks;
                 blocks.push_back(header_block);
-                pack(thing, blocks);
-                m_stream.write_blocks(blocks);
+                if (pack(thing, blocks) != Status::OK)
+                {
+                    std::cerr << "Cound not read " << thing << '\n';
+                    return Status::ERROR;
+                }
             }
-
+            m_stream.write_blocks(blocks);
             to_be_visited.pop();
         }
 
@@ -468,6 +474,7 @@ namespace TAR
         }
 
         std::memset(&header, 0, sizeof(Block));
+
         std::strncpy(header.name, path.string().c_str(), sizeof(header.name) - 1);
         std::sprintf(header.mode, "%0*o",
                      static_cast<int>(sizeof(header.mode)) - 1,
@@ -518,6 +525,55 @@ namespace TAR
         header.chksum[sizeof(header.chksum)-1] = 0x20;
 
         return Status::OK;
+    }
+
+    void Archiver::create_long_name_blocks(const std::string& name,
+                                           std::vector<Block>& blocks,
+                                           const Header& real_header)
+    {
+        Block fake_block;
+        std::memset(&fake_block, 0, sizeof(Block));
+        Header& fake_header = fake_block.as_header;
+
+        std::strncpy(fake_header.name, "././@LongLink", sizeof(fake_header.name) - 1);
+        std::strncpy(fake_header.mode, real_header.mode, sizeof(fake_header.mode));
+        std::memset(fake_header.uid, '0', sizeof(fake_header.uid)-1);
+        std::memset(fake_header.gid, '0', sizeof(fake_header.gid)-1);
+        std::sprintf(fake_header.size, "%0*lo",
+                     static_cast<int>(sizeof(fake_header.size)) - 1,
+                     name.size());
+        std::memset(fake_header.mtime, '0', sizeof(fake_header.mtime)-1);
+        fake_header.typeflag = 'L';
+        std::sprintf(fake_header.magic, "ustar");
+        fake_header.version[0] = 0x30;
+        fake_header.version[1] = 0x30;
+        std::strncpy(fake_header.uname, "root", sizeof(fake_header.uname) - 1);
+        std::strncpy(fake_header.gname, "root", sizeof(fake_header.gname) - 1);
+        std::sprintf(fake_header.chksum, "%0*o",
+                     static_cast<int>(sizeof(fake_header.chksum)) - 2,
+                     fake_block.calculate_checksum());
+        fake_header.chksum[sizeof(fake_header.chksum)-1] = 0x20;
+
+        blocks.push_back(fake_block);
+
+        std::size_t size = name.size();
+        std::size_t nBlocks = size/BLOCK_SIZE;
+        if (size % BLOCK_SIZE)
+            nBlocks++;
+
+        const char* pName = name.c_str();
+        for (std::size_t i = 0; i < nBlocks; ++i)
+        {
+            Block block;
+            if (i != nBlocks - 1)
+                std::memcpy(&block, pName + i*BLOCK_SIZE, BLOCK_SIZE);
+            else
+            {
+                std::memset(&block, 0, sizeof(Block));
+                std::memcpy(&block, pName + i*BLOCK_SIZE, size % BLOCK_SIZE);
+            }
+            blocks.push_back(block);
+        }
     }
 
     Status Archiver::pack(const fs::path& path, std::vector<Block>& blocks)

@@ -35,7 +35,7 @@ namespace TAR
         char gname[32];
         char devmajor[8];
         char devminor[8];
-        char prefix[15];
+        char prefix[155];
 
         std::uint32_t size_in_blocks() const;
         std::uint32_t size_in_bytes() const;
@@ -156,6 +156,9 @@ namespace TAR
     private:
 
         Status create_header(const fs::path& path, Block& header_block);
+        void create_long_name_blocks(const std::string& path,
+                                      std::vector<Block>& blocks,
+                                      const Header& real_header);
         Status pack(const fs::path& path, std::vector<Block>& blocks);
         OutStream m_stream;
     };
