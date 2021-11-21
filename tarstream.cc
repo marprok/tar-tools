@@ -101,7 +101,7 @@ namespace TAR
 
     std::uint32_t BlockStream::record_id() { return m_record_id; }
     std::uint32_t BlockStream::block_id() { return m_block_id; }
-    void          BlockStream::set_file_path(const fs::path& file_path) { m_file_path = file_path; }
+    void BlockStream::set_file_path(const fs::path& file_path) { m_file_path = file_path; }
 
     InStream::InStream(fs::path file_path, std::uint32_t blocking_factor)
         :BlockStream(blocking_factor),
@@ -132,9 +132,7 @@ namespace TAR
                 return Status::END;
         }
 
-        auto from = m_record.get() + m_block_id*BLOCK_SIZE;
-        auto to = from + BLOCK_SIZE;
-        std::copy(from, to, raw.as_data);
+        raw = m_record[m_block_id];
 
         if (advance)
             m_block_id++;
@@ -143,7 +141,6 @@ namespace TAR
         {
             m_block_id = 0;
             m_record_id = m_stream.tellg() / (BLOCK_SIZE*m_blocking_factor);
-            std::memset(m_record.get(), 0 , BLOCK_SIZE*m_blocking_factor);
             m_should_read = true;
         }
 
@@ -153,7 +150,7 @@ namespace TAR
     Status InStream::read_record()
     {
         if (!m_record)
-            m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
+            m_record = std::make_unique<Block[]>(m_blocking_factor);
 
         m_stream.read(reinterpret_cast<char*>(m_record.get()),
                       BLOCK_SIZE*m_blocking_factor);
@@ -171,17 +168,14 @@ namespace TAR
 
     Status InStream::seek_record(std::uint32_t record_id)
     {
-        // find the record
         m_stream.seekg(record_id*BLOCK_SIZE*m_blocking_factor);
         if (!m_stream)
             return Status::ERROR;
 
-        // read the record
         m_record_id = record_id;
         if (read_record() != Status::OK)
             return Status::ERROR;
 
-        // reset the block id
         m_block_id = 0;
 
         return Status::OK;
@@ -352,22 +346,17 @@ namespace TAR
     Status OutStream::write_block(const Block& block)
     {
         if (!m_record)
-        {
-            m_record = std::make_unique<std::uint8_t[]>(BLOCK_SIZE*m_blocking_factor);
-            std::memset(m_record.get(), 0, BLOCK_SIZE*m_blocking_factor);
-        }
+            m_record = std::make_unique<Block[]>(m_blocking_factor);
 
         if (m_block_id >= m_blocking_factor)
         {
             if (flush_record() != Status::OK)
                 return Status::ERROR;
 
-            m_block_id = 0;
             m_record_id++;
         }
 
-        std::copy(block.as_data, block.as_data + BLOCK_SIZE,
-                  m_record.get() + m_block_id*BLOCK_SIZE);
+        m_record[m_block_id] = block;
         m_block_id++;
 
         return Status::OK;
@@ -387,13 +376,19 @@ namespace TAR
         if (!m_record)
             return Status::ERROR;
 
+        if (m_block_id < m_blocking_factor)
+        {
+            auto padding = m_blocking_factor - m_block_id;
+            std::memset(m_record.get() + m_block_id, 0, BLOCK_SIZE*padding);
+        }
+
         m_stream.write(reinterpret_cast<char*>(m_record.get()),
                       BLOCK_SIZE*m_blocking_factor);
 
         if (!m_stream)
             return Status::ERROR;
 
-        std::memset(m_record.get(), 0, BLOCK_SIZE*m_blocking_factor);
+        m_block_id = 0;
 
         return Status::OK;
     }
@@ -477,7 +472,7 @@ namespace TAR
         std::strncpy(header.name, path.string().c_str(), sizeof(header.name) - 1);
         std::sprintf(header.mode, "%0*o",
                      static_cast<int>(sizeof(header.mode)) - 1,
-                     info.st_mode & ~S_IFMT);
+                     static_cast<std::uint16_t>(info.st_mode & ~S_IFMT));
         std::sprintf(header.uid, "%0*o",
                      static_cast<int>(sizeof(header.uid)) - 1,
                      info.st_uid);

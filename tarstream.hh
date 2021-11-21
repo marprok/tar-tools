@@ -83,7 +83,7 @@ namespace TAR
         std::uint32_t m_blocking_factor;
         std::uint32_t m_block_id;
         std::uint32_t m_record_id;
-        std::unique_ptr<std::uint8_t[]> m_record;
+        std::unique_ptr<Block[]> m_record;
         std::fstream m_stream;
     };
 
