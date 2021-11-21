@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <vector>
+#include <list>
 #include <unordered_map>
 #include <memory>
 #include <type_traits>
@@ -58,6 +59,7 @@ namespace TAR
     struct File
     {
         Header header;
+        std::string name;
     private:
         std::uint32_t m_block_id;
         std::uint32_t m_record_id;
@@ -118,7 +120,7 @@ namespace TAR
 
         Status next_file(File& file);
         Data read_file(File& file);
-        Status list_files(std::vector<File>& list);
+        Status list_files(std::list<File>& list);
     private:
         bool check_block(Block& block);
         Data unpack(const Header& header);

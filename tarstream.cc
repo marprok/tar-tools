@@ -16,7 +16,7 @@ namespace TAR
 
     std::ostream& operator<<(std::ostream& os, const Header& header)
     {
-        os << "name: " << header.name << '\n';
+        //os << "name: " << header.name << '\n';
         os << "mode: " << header.mode << '\n';
         os << "uid: " << header.uid << '\n';
         os << "gid: " << header.gid << '\n';
@@ -223,6 +223,10 @@ namespace TAR
         if (!check_block(header_block))
             return Status::ERROR;
 
+        if (file.header.name[sizeof(file.header.name)-1])
+            file.name = std::string(file.header.name, sizeof(file.header.name));
+        else
+            file.name = std::string(file.header.name);
         file.header = header_block.as_header;
         file.m_block_id = m_stream.block_id();
         file.m_record_id = m_stream.record_id();
@@ -238,7 +242,7 @@ namespace TAR
         return unpack(file.header);
     }
 
-    Status Parser::list_files(std::vector<File>& list)
+    Status Parser::list_files(std::list<File>& list)
     {
         m_stream.seek_record(0);
         list.clear();
@@ -275,13 +279,14 @@ namespace TAR
             return false;
         }
 
-        block.as_header.name[sizeof(block.as_header.name)-1] = '\0';
+        //block.as_header.name[sizeof(block.as_header.name)-1] = '\0';
+
         block.as_header.mode[sizeof(block.as_header.mode)-1] = '\0';
         block.as_header.uid[sizeof(block.as_header.uid)-1] = '\0';
         block.as_header.gid[sizeof(block.as_header.gid)-1] = '\0';
         block.as_header.size[sizeof(block.as_header.size)-1] = '\0';
         block.as_header.mtime[sizeof(block.as_header.mtime)-1] = '\0';
-        block.as_header.linkname[sizeof(block.as_header.linkname)-1] = '\0';
+        //block.as_header.linkname[sizeof(block.as_header.linkname)-1] = '\0';
         block.as_header.magic[sizeof(block.as_header.magic)-1] = '\0';
         block.as_header.uname[sizeof(block.as_header.uname)-1] = '\0';
         block.as_header.gname[sizeof(block.as_header.gname)-1] = '\0';
@@ -424,7 +429,7 @@ namespace TAR
             create_header(thing, header_block);
             std::vector<Block> blocks;
             // Handle the case of too long names
-            if (thing.string().size() > 99)
+            if (thing.string().size() > 100)
                 create_long_name_blocks(thing.string(), blocks, header_block.as_header);
 
             if (fs::is_directory(thing))
@@ -442,6 +447,8 @@ namespace TAR
                     return Status::ERROR;
                 }
             }
+
+            //std::cout << thing << " " << blocks.size() << " blocks\n";
             m_stream.write_blocks(blocks);
             to_be_visited.pop();
         }
@@ -469,7 +476,10 @@ namespace TAR
 
         std::memset(&header, 0, sizeof(Block));
 
-        std::strncpy(header.name, path.string().c_str(), sizeof(header.name) - 1);
+        if (header.name[sizeof(header.name)])
+            std::memcpy(header.name, path.string().c_str(), sizeof(header.name));
+        else
+            std::strncpy(header.name, path.string().c_str(), sizeof(header.name)-1);
         std::sprintf(header.mode, "%0*o",
                      static_cast<int>(sizeof(header.mode)) - 1,
                      static_cast<std::uint16_t>(info.st_mode & ~S_IFMT));
