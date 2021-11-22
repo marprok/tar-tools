@@ -508,7 +508,7 @@ namespace TAR
         std::memset(&fake_block, 0, sizeof(Block));
         Header& fake_header = fake_block.as_header;
 
-        std::strncpy(fake_header.name, "././@LongLink", sizeof(fake_header.name) - 1);
+        std::strncpy(fake_header.name, "././@LongName", sizeof(fake_header.name) - 1);
         std::strncpy(fake_header.mode, real_header.mode, sizeof(fake_header.mode));
         std::memset(fake_header.uid, '0', sizeof(fake_header.uid)-1);
         std::memset(fake_header.gid, '0', sizeof(fake_header.gid)-1);
