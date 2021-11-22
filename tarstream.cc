@@ -197,7 +197,7 @@ namespace TAR
         {
             auto name_bytes = unpack(block.as_header);
             file.name = std::string(name_bytes.begin(),
-                                              name_bytes.end());
+                                    name_bytes.end());
 
             st = m_stream.read_block(block);
             if (st != Status::OK)
@@ -213,7 +213,6 @@ namespace TAR
             else
                 file.name = std::string(block.as_header.name);
         }
-
 
         file.header = block.as_header;
         file.m_block_id = m_stream.block_id();
@@ -430,7 +429,6 @@ namespace TAR
                 }
             }
 
-            //std::cout << thing << " " << blocks.size() << " blocks\n";
             m_stream.write_blocks(blocks);
             to_be_visited.pop();
         }
