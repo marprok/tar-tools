@@ -479,8 +479,8 @@ namespace TAR
         std::sprintf(header.mtime, "%lo", info.st_mtime);
         std::sprintf(header.magic, "ustar");
 
-        header.version[0] = 0x30;
-        header.version[1] = 0x30;
+        header.version[0] = 0x20;
+        header.version[1] = 0x20;
 
         struct passwd *pw = getpwuid(info.st_uid);
         if (pw)
@@ -518,8 +518,8 @@ namespace TAR
         std::memset(fake_header.mtime, '0', sizeof(fake_header.mtime)-1);
         fake_header.typeflag = 'L';
         std::sprintf(fake_header.magic, "ustar");
-        fake_header.version[0] = 0x30;
-        fake_header.version[1] = 0x30;
+        fake_header.version[0] = 0x20;
+        fake_header.version[1] = 0x20;
         std::strncpy(fake_header.uname, "root", sizeof(fake_header.uname) - 1);
         std::strncpy(fake_header.gname, "root", sizeof(fake_header.gname) - 1);
         std::sprintf(fake_header.chksum, "%0*o",
