@@ -122,7 +122,7 @@ namespace TAR
         Data read_file(File& file);
         Status list_files(std::list<File>& list);
     private:
-        bool check_block(Block& block);
+        Status check_block(Block& block);
         Data unpack(const Header& header);
 
         InStream &m_stream;

@@ -184,33 +184,38 @@ namespace TAR
 
     Status Parser::next_file(File& file)
     {
-        Block header_block;
-        Status st = m_stream.read_block(header_block);
+        Block block;
+        Status st = m_stream.read_block(block);
         if (st != Status::OK)
             return st;
 
-        if (header_block.is_zero_block())
+        st = check_block(block);
+        if (st != Status::OK)
+            return st;
+
+        if (block.as_header.typeflag == 'L')
         {
-            m_stream.read_block(header_block, false);
-            if (header_block.is_zero_block())
-                return Status::END;
+            auto name_bytes = unpack(block.as_header);
+            file.name = std::string(name_bytes.begin(),
+                                              name_bytes.end());
+
+            st = m_stream.read_block(block);
+            if (st != Status::OK)
+                return st;
+
+            st = check_block(block);
+            if (st != Status::OK)
+                return st;
+        }else
+        {
+            if (block.as_header.name[sizeof(block.as_header.name)-1])
+                file.name = std::string(block.as_header.name, 100);
             else
-                return Status::ERROR;
+                file.name = std::string(block.as_header.name);
         }
 
-        std::uint32_t sum = header_block.calculate_checksum();
-        std::uint32_t header_sum = std::stoi(header_block.as_header.chksum, nullptr, 8);
-        if (sum != header_sum)
-        {
-            std::cerr << "Not matching checksums!\n";
-            return Status::ERROR;
-        }
 
-        if (file.header.name[sizeof(file.header.name)-1])
-            file.name = std::string(file.header.name, sizeof(file.header.name));
-        else
-            file.name = std::string(file.header.name);
-        file.header = header_block.as_header;
+        file.header = block.as_header;
         file.m_block_id = m_stream.block_id();
         file.m_record_id = m_stream.record_id();
 
@@ -252,17 +257,26 @@ namespace TAR
         return Status::OK;
     }
 
-    bool Parser::check_block(Block &block)
+    Status Parser::check_block(Block &block)
     {
+        if (block.is_zero_block())
+        {
+            m_stream.read_block(block, false);
+            if (block.is_zero_block())
+                return Status::END;
+            else
+                return Status::ERROR;
+        }
+
         std::uint32_t sum = block.calculate_checksum();
         std::uint32_t header_sum = std::stoi(block.as_header.chksum, nullptr, 8);
         if (sum != header_sum)
         {
             std::cerr << "Not matching checksums!\n";
-            return false;
+            return Status::ERROR;
         }
 
-        return true;
+        return Status::OK;
     }
 
     Data Parser::unpack(const Header& header)
