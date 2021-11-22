@@ -14,28 +14,6 @@ namespace TAR
     // Make sure that a block is exactly BLOCK_SIZE bytes
     static_assert(sizeof(Block) == BLOCK_SIZE);
 
-    std::ostream& operator<<(std::ostream& os, const Header& header)
-    {
-        //os << "name: " << header.name << '\n';
-        os << "mode: " << header.mode << '\n';
-        os << "uid: " << header.uid << '\n';
-        os << "gid: " << header.gid << '\n';
-        os << "size: " << header.size << '\n';
-        os << "mtime: " << header.mtime << '\n';
-        os << "checksum: " << header.chksum << '\n';
-        os << "typeflag: " << header.typeflag << '\n';
-        os << "linkname: " << header.linkname << '\n';
-        os << "magic: " << header.magic << '\n';
-        os << "version: " << header.version[0] << header.version[1] << '\n';
-        os << "uname: " << header.uname << '\n';
-        os << "gname: " << header.gname << '\n';
-        os << "devmajor: " << header.devmajor << '\n';
-        os << "devminor: " << header.devminor << '\n';
-        os << "prefix: " << header.prefix << '\n';
-
-        return os;
-    }
-
     std::ostream& operator<<(std::ostream& os, const Block& block)
     {
         for (std::uint32_t i = 0; i < BLOCK_SIZE; ++i)
@@ -220,8 +198,13 @@ namespace TAR
                 return Status::ERROR;
         }
 
-        if (!check_block(header_block))
+        std::uint32_t sum = header_block.calculate_checksum();
+        std::uint32_t header_sum = std::stoi(header_block.as_header.chksum, nullptr, 8);
+        if (sum != header_sum)
+        {
+            std::cerr << "Not matching checksums!\n";
             return Status::ERROR;
+        }
 
         if (file.header.name[sizeof(file.header.name)-1])
             file.name = std::string(file.header.name, sizeof(file.header.name));
@@ -278,21 +261,6 @@ namespace TAR
             std::cerr << "Not matching checksums!\n";
             return false;
         }
-
-        //block.as_header.name[sizeof(block.as_header.name)-1] = '\0';
-
-        block.as_header.mode[sizeof(block.as_header.mode)-1] = '\0';
-        block.as_header.uid[sizeof(block.as_header.uid)-1] = '\0';
-        block.as_header.gid[sizeof(block.as_header.gid)-1] = '\0';
-        block.as_header.size[sizeof(block.as_header.size)-1] = '\0';
-        block.as_header.mtime[sizeof(block.as_header.mtime)-1] = '\0';
-        //block.as_header.linkname[sizeof(block.as_header.linkname)-1] = '\0';
-        block.as_header.magic[sizeof(block.as_header.magic)-1] = '\0';
-        block.as_header.uname[sizeof(block.as_header.uname)-1] = '\0';
-        block.as_header.gname[sizeof(block.as_header.gname)-1] = '\0';
-        block.as_header.devmajor[sizeof(block.as_header.devmajor)-1] = '\0';
-        block.as_header.devminor[sizeof(block.as_header.devminor)-1] = '\0';
-        block.as_header.prefix[sizeof(block.as_header.prefix)-1] = '\0';
 
         return true;
     }
@@ -475,11 +443,12 @@ namespace TAR
         }
 
         std::memset(&header, 0, sizeof(Block));
-
-        if (header.name[sizeof(header.name)])
+        std::string name = path.string();
+        if (name.size() >= 100)
             std::memcpy(header.name, path.string().c_str(), sizeof(header.name));
         else
-            std::strncpy(header.name, path.string().c_str(), sizeof(header.name)-1);
+            std::strncpy(header.name, path.string().c_str(), sizeof(header.name) - 1);
+
         std::sprintf(header.mode, "%0*o",
                      static_cast<int>(sizeof(header.mode)) - 1,
                      static_cast<std::uint16_t>(info.st_mode & ~S_IFMT));
