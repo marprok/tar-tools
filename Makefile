@@ -17,4 +17,4 @@ archiver.o: archiver.cc tarstream.hh
 	$(CXX) $(CXXFLAGS) -c archiver.cc -o archiver.o
 
 clean:
-	rm archiver archiver.o parser.o tarstream.o
+	rm archiver parser archiver.o parser.o tarstream.o
