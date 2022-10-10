@@ -70,24 +70,23 @@ namespace TAR
         return std::stoi(size, nullptr, 8);
     }
 
-    BlockStream::BlockStream(std::uint32_t blocking_factor)
-        :m_blocking_factor(blocking_factor),
-         m_block_id(0),
-         m_record_id(0)
+    BlockStream::BlockStream(const std::string& file_path, std::uint32_t blocking_factor)
+        : m_file_path(file_path)
+        , m_blocking_factor(blocking_factor)
+        , m_block_id(0)
+        , m_record_id(0)
     {
     }
 
     std::uint32_t BlockStream::record_id() { return m_record_id; }
+
     std::uint32_t BlockStream::block_id() { return m_block_id; }
-    void BlockStream::set_file_path(const fs::path& file_path) { m_file_path = file_path; }
 
     InStream::InStream(fs::path file_path, std::uint32_t blocking_factor)
-        :BlockStream(blocking_factor),
-         m_should_read(true)
+        : BlockStream(file_path, blocking_factor)
+        , m_should_read(true)
     {
-        set_file_path(file_path);
-        m_records_in_file = fs::file_size(m_file_path)/(m_blocking_factor*BLOCK_SIZE);
-
+        m_records_in_file = fs::file_size(m_file_path) / (m_blocking_factor * BLOCK_SIZE);
         m_stream.open(m_file_path, std::ios::in | std::ios::binary);
         if (!m_stream)
         {
@@ -305,28 +304,22 @@ namespace TAR
         return bytes;
     }
 
-    OutStream::OutStream(std::uint32_t blocking_factor)
-        :BlockStream(blocking_factor)
+    OutStream::OutStream(const std::string& file_path, std::uint32_t blocking_factor)
+        : BlockStream(file_path, blocking_factor)
     {
-    }
-
-    Status OutStream::open_output_file(const fs::path& file_path)
-    {
-        set_file_path(file_path);
         m_stream.open(m_file_path, std::ios::out | std::ios::binary);
         if (!m_stream)
-            return Status::ERROR;
-
-        return Status::OK;
+        {
+            std::string error_msg("Could not open file ");
+            error_msg.append(file_path);
+            throw std::runtime_error(error_msg);
+        }
     }
 
-    void OutStream::close_output_file()
+    OutStream::~OutStream()
     {
         if (m_block_id != 0)
             flush_record();
-
-        set_file_path({});
-        m_stream.close();
     }
 
     Status OutStream::write_block(const Block& block)
@@ -379,13 +372,7 @@ namespace TAR
         return Status::OK;
     }
 
-    Archiver::Archiver(std::uint32_t blocking_factor)
-        :m_stream(blocking_factor)
-    {
-
-    }
-
-    Status Archiver::archive(const fs::path& src, const fs::path& dest)
+    Status Archiver::archive(const fs::path& src, const fs::path& dest, std::uint32_t blocking_factor)
     {
         if (!fs::exists(src))
         {
@@ -393,20 +380,14 @@ namespace TAR
             return Status::ERROR;
         }
 
-        if (m_stream.open_output_file(dest) != Status::OK)
-        {
-            std::string error_msg("Could not create file ");
-            error_msg.append(dest);
-            throw std::runtime_error(error_msg);
-        }
-
+        OutStream            out_stream(dest, blocking_factor);
         std::queue<fs::path> to_be_visited;
         to_be_visited.push(src);
 
         while (!to_be_visited.empty())
         {
             const auto& thing = to_be_visited.front();
-            Block header_block;
+            Block       header_block;
             create_header(thing, header_block);
             std::vector<Block> blocks;
             // Handle the case of too long names
@@ -415,7 +396,7 @@ namespace TAR
 
             if (fs::is_directory(thing))
             {
-                for(auto const& entry: std::filesystem::directory_iterator{thing})
+                for (auto const& entry : std::filesystem::directory_iterator { thing })
                     to_be_visited.push(entry.path());
                 blocks.push_back(header_block);
             }
@@ -429,16 +410,15 @@ namespace TAR
                 }
             }
 
-            m_stream.write_blocks(blocks);
+            out_stream.write_blocks(blocks);
             to_be_visited.pop();
         }
 
         // Write two zero blocks to indicate the end of the archive
         Block zeros;
         std::memset(&zeros, 0, sizeof(Block));
-        m_stream.write_block(zeros);
-        m_stream.write_block(zeros);
-        m_stream.close_output_file();
+        out_stream.write_block(zeros);
+        out_stream.write_block(zeros);
 
         return Status::OK;
     }
@@ -563,18 +543,19 @@ namespace TAR
     Status Archiver::pack(const fs::path& path, std::vector<Block>& blocks)
     {
         std::fstream in(path, std::ios::in | std::ios::binary);
-        std::size_t total_bytes = fs::file_size(path);
-        std::size_t total_blocks = total_bytes/BLOCK_SIZE;
+        std::size_t  total_bytes  = fs::file_size(path);
+        std::size_t  total_blocks = total_bytes / BLOCK_SIZE;
 
-        if (total_bytes%BLOCK_SIZE) total_blocks++;
+        if (total_bytes % BLOCK_SIZE)
+            total_blocks++;
         blocks.reserve(blocks.capacity() + total_blocks);
 
         std::array<Block, 10> cache;
-        std::size_t blocks_read = 0;
+        std::size_t           blocks_read = 0;
         while (total_blocks > 0)
         {
-            std::memset(cache.data(), 0, cache.size()*sizeof(Block));
-            in.read(reinterpret_cast<char*>(cache.data()), cache.size()*sizeof(Block));
+            std::memset(cache.data(), 0, cache.size() * sizeof(Block));
+            in.read(reinterpret_cast<char*>(cache.data()), cache.size() * sizeof(Block));
             if (total_blocks > cache.size())
                 blocks_read = cache.size();
             else
@@ -589,4 +570,4 @@ namespace TAR
 
         return Status::OK;
     }
-}
+    }
