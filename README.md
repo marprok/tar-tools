@@ -1,6 +1,10 @@
 # tar-tools
 
-A simple parser and a simple archiver for tarballs
+A simple parser and a simple archiver for tarballs.
+
+### Important Note
+This project was created as a way for the author to study how a tar archive is made.  
+It is not thoroughly tested and it has no unit tests so keep that in mind while using it :) 
 
 ### Prerequisites
 * g++(c++-20 support is needed)
