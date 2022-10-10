@@ -18,7 +18,7 @@ namespace TAR
     typedef std::vector<std::uint8_t> Data;
     constexpr std::uint32_t BLOCK_SIZE = 512;
 
-   // The header block(POSIX 1003.1-1990)
+    // The header block(POSIX 1003.1-1990)
     struct Header
     {
         char name[100];
@@ -155,14 +155,14 @@ namespace TAR
         Archiver& operator=(const Archiver& other) = delete;
 
         Status archive(const fs::path& src, const fs::path& dest);
-    private:
 
-        Status create_header(const fs::path& path, Block& header_block);
-        void create_long_name_blocks(const std::string& path,
-                                      std::vector<Block>& blocks,
-                                      const Header& real_header);
-        Status pack(const fs::path& path, std::vector<Block>& blocks);
+    private:
+        Status    create_header(const fs::path& path, Block& header_block);
+        void      create_long_name_blocks(const std::string&  path,
+                                          std::vector<Block>& blocks,
+                                          const Header&       real_header);
+        Status    pack(const fs::path& path, std::vector<Block>& blocks);
         OutStream m_stream;
     };
-}
+    }
 #endif // TARSTREAM_HH

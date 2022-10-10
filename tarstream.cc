@@ -256,7 +256,7 @@ namespace TAR
         return Status::OK;
     }
 
-    Status Parser::check_block(Block &block)
+    Status Parser::check_block(Block& block)
     {
         if (block.is_zero_block())
         {
@@ -267,7 +267,7 @@ namespace TAR
                 return Status::ERROR;
         }
 
-        std::uint32_t sum = block.calculate_checksum();
+        std::uint32_t sum        = block.calculate_checksum();
         std::uint32_t header_sum = std::stoi(block.as_header.chksum, nullptr, 8);
         if (sum != header_sum)
         {
@@ -365,11 +365,11 @@ namespace TAR
         if (m_block_id < m_blocking_factor)
         {
             auto padding = m_blocking_factor - m_block_id;
-            std::memset(m_record.get() + m_block_id, 0, BLOCK_SIZE*padding);
+            std::memset(m_record.get() + m_block_id, 0, BLOCK_SIZE * padding);
         }
 
         m_stream.write(reinterpret_cast<char*>(m_record.get()),
-                      BLOCK_SIZE*m_blocking_factor);
+                       BLOCK_SIZE * m_blocking_factor);
 
         if (!m_stream)
             return Status::ERROR;
