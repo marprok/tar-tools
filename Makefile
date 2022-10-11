@@ -1,4 +1,4 @@
-CXXFLAGS = -Wall -Wextra -std=c++20 -O3
+CXXFLAGS = -pedantic -Werror -Wall -Wextra -std=c++20 -O3
 CXX = g++
 
 tarstream.o: tarstream.cc tarstream.hh
