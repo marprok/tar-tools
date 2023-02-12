@@ -161,10 +161,6 @@ public:
 
     OutStream& operator=(const OutStream& other) = delete;
 
-    Status open_output_file(const fs::path& file_path);
-
-    void close_output_file();
-
     Status write_block(const Block& block);
 
     Status write_blocks(const std::vector<Block>& blocks);
