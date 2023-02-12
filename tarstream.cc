@@ -537,8 +537,11 @@ void Archiver::create_long_name_blocks(const std::string&  name,
             std::memcpy(&block, pName + i * BLOCK_SIZE, BLOCK_SIZE);
         else
         {
+            std::size_t last_block_size = BLOCK_SIZE;
+            if (size % BLOCK_SIZE)
+                last_block_size = size % BLOCK_SIZE;
             std::memset(&block, 0, sizeof(Block));
-            std::memcpy(&block, pName + i * BLOCK_SIZE, size % BLOCK_SIZE);
+            std::memcpy(&block, pName + i * BLOCK_SIZE, last_block_size);
         }
         blocks.push_back(block);
     }
